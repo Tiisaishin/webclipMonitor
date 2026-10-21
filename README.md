@@ -122,6 +122,67 @@ You can also run the worker separately (e.g. multiple workers):
 npm run worker
 ```
 
+## Deployment
+
+### Docker (local / any host)
+
+The image is built from Playwright's official base image, so Chromium and all its
+OS libraries are already baked in — no `playwright install` step.
+
+One command brings up PostgreSQL + the web service:
+
+```bash
+docker compose up --build
+# open http://localhost:3000
+```
+
+Or build and run the web container against your own database:
+
+```bash
+docker build -t webclip-monitor .
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgres://user:pass@host:5432/webclip_monitor" \
+  webclip-monitor
+```
+
+The container starts the HTTP API, the scan worker, and the cron scheduler, and
+runs the schema migration on boot. It listens on `$PORT` (default 3000).
+
+### Render (free tier, no Blueprint)
+
+Two resources created **separately** in the dashboard — no `render.yaml`:
+
+**1. PostgreSQL**
+- New → **PostgreSQL**, Free plan. Name it (e.g. `webclip-db`), create.
+- From its page, copy the **Internal Database URL** (used by the web service in
+  the same region — no SSL needed).
+
+**2. Web Service (Docker)**
+- New → **Web Service**, connect this repo.
+- **Runtime: Docker** (Render auto-detects the `Dockerfile`; leave build/start
+  commands empty).
+- Instance type: **Free**.
+- **Environment variables:**
+  - `DATABASE_URL` = the Postgres **Internal Database URL** from step 1.
+  - (optional) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — or set them later in
+    the web admin.
+  - If you ever point it at an **External** database URL instead, also set
+    `DATABASE_SSL=true`.
+  - Do **not** set `PORT` — Render injects it, and the app honours it.
+- **Health check path:** `/api/health`.
+- Create. The schema migrates automatically on first boot.
+
+**Free-tier caveats**
+- A free web service **spins down after ~15 min idle**, so the in-process cron
+  scheduler won't fire while it's asleep — scheduled rescans only run while the
+  service is awake. Trigger scans manually, ping the service to keep it warm, or
+  use a paid instance for reliable rescans. One-off and on-demand scans work
+  regardless.
+- Free instances have 512 MB RAM; Chromium is memory-hungry, so keep
+  `CRAWL_CONCURRENCY` low (1–2) on free tier.
+- Free Postgres is time-limited by Render's current policy; back up anything you
+  need to keep.
+
 ## Configuration
 
 See `.env.example`. Notable settings:

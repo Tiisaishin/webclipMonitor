@@ -13,8 +13,14 @@ function bool(name, fallback) {
   return /^(1|true|yes|on)$/i.test(v);
 }
 
+const databaseUrl = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/webclip_monitor';
+
 export const config = {
-  databaseUrl: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/webclip_monitor',
+  databaseUrl,
+  // Managed Postgres (Render, etc.) over an external URL needs TLS. Enable it
+  // via DATABASE_SSL=true or an `sslmode=require` in the URL; internal URLs
+  // (same-provider network) don't need it.
+  databaseSsl: bool('DATABASE_SSL', false) || /sslmode=require/i.test(databaseUrl),
   port: int('PORT', 3000),
   host: process.env.HOST || '0.0.0.0',
 
