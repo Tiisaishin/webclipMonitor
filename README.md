@@ -30,6 +30,13 @@ Given an entry URL, the crawler walks the discovery tree **exhaustively**:
      ROT13/ROT47, and gzip/deflate/brotli — composed recursively, so layered
      schemes (e.g. `percent → base64 → gzip`) unwrap on their own. XOR
      (single-byte brute force + configured keys) runs alongside.
+   - **Static AES** for pages that keep the key in the page or a per-domain
+     rule: CryptoJS passphrase mode (OpenSSL `Salted__` + MD5 `EVP_BytesToKey`,
+     trying passphrases auto-extracted from the page and from rules) and raw
+     key/iv mode (`aes-128/192/256-cbc|ecb`). The in-page `CryptoJS` object's
+     `decrypt` is also wrapped at runtime to capture its plaintext.
+   - **Per-domain / per-template decode rules** (see below) supply site-specific
+     XOR/AES keys and custom extract regexes, applied only to matching URLs.
 
    Because pages also execute in a real browser, runtime redirects and the URLs
    the JS actually requests are captured directly.
@@ -76,7 +83,9 @@ Key modules:
 |------|----------------|
 | `src/crawler/fetcher.js` | iPhone-emulated Playwright fetch; captures redirect chain, sub-requests, DOM links, page title/description, and runtime-decoded plaintext via sink hooks |
 | `src/crawler/decoders/transforms.js` | the static transform registry (base64/32/58, hex, percent, entities, escapes, fromCharCode, char-array, reverse, rot, gzip/deflate/brotli) |
-| `src/crawler/decoders/` | recursive decoder pipeline + XOR + runtime-sink URL harvesting |
+| `src/crawler/decoders/aes.js` | static AES (CryptoJS passphrase mode + raw key/iv) |
+| `src/crawler/decoders/rules.js` | per-domain rule matching, key/regex resolution |
+| `src/crawler/decoders/` | recursive decoder pipeline + XOR + AES + runtime-sink URL harvesting |
 | `src/crawler/webclip.js` | webclip detection, PKCS7 unwrap, plist parse, URL→domain |
 | `src/crawler/urls.js` | URL resolve / normalize / dedup / hand-off scheme expansion |
 | `src/scan/orchestrator.js` | exhaustive BFS crawl tree, node cap, webclip-as-leaf |
@@ -127,12 +136,42 @@ Telegram token/chat id, the warn window, and optional known XOR keys can also be
 set at runtime from the **Settings** tab (stored in the `settings` table,
 overriding env).
 
+## Per-domain decode rules
+
+For sites with their own private encoding, add rules in **Settings → Per-domain
+decode rules** (stored as the `decode_rules` JSON setting). Each rule targets
+URLs by `match` (a regex tested against the URL; falls back to substring) and
+may supply site-specific XOR keys, AES keys, and/or a custom extract regex. They
+apply only to matching URLs; everything else uses the generic auto-detection.
+
+```json
+[
+  {
+    "match": "promo\\.example\\.com",
+    "aesKeys": [{ "passphrase": "s3cret" }],
+    "xorKeys": ["0x5a", "mykey"],
+    "extract": "data-config=\"([^\"]+)\""
+  },
+  {
+    "match": "cdn\\.example\\.net/lp",
+    "aesKeys": [{ "key": "hex:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", "iv": "hex:0102030405060708090a0b0c0d0e0f10", "mode": "cbc" }]
+  }
+]
+```
+
+- `aesKeys[].passphrase` — CryptoJS passphrase mode (OpenSSL `Salted__`).
+- `aesKeys[].key` / `.iv` — raw key/iv as `hex:…`, `base64:…`, or plain UTF-8;
+  `.mode` is `cbc` (default) or `ecb`. Key length selects AES-128/192/256.
+- `xorKeys` — extra XOR keys tried on this site's ciphertext blobs.
+- `extract` — a regex; capture group 1 (or the whole match) is taken as a URL.
+
 ## Web admin
 
 - **Tasks** — create tasks (entry URL, max depth, optional cron), run on demand,
   inspect a run's webclips and full crawl tree.
 - **Domains** — all tracked domains sorted by expiry risk; re-check on demand.
-- **Settings** — Telegram config + test message, warn window, XOR keys.
+- **Settings** — Telegram config + test message, warn window, XOR keys, and
+  per-domain decode rules (JSON).
 
 ## REST API
 

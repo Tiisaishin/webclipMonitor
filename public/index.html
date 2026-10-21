@@ -77,6 +77,10 @@
           <label>Known XOR keys (comma separated, optional)
             <input name="xor_keys" placeholder="mykey,0xAB" />
           </label>
+          <label class="full">Per-domain decode rules (JSON array, optional)
+            <textarea name="decode_rules" rows="8" spellcheck="false"
+              placeholder='[{"match":"example\\.com","aesKeys":[{"passphrase":"s3cret"}],"xorKeys":["0x5a"],"extract":"data-url=\"([^\"]+)\""}]'></textarea>
+          </label>
           <div class="row">
             <button type="submit">Save</button>
             <button type="button" id="tg-test">Send test message</button>

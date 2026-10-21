@@ -79,6 +79,33 @@ function sinkHookScript() {
         Wrapped.prototype = _Function.prototype;
         window.Function = Wrapped;
       } catch (e) { /* ignore */ }
+      // CryptoJS is the usual in-page AES/RC4 lib. addInitScript runs before
+      // the page loads it, so trap the assignment and wrap its decrypt to
+      // record the decoded plaintext (WordArray -> Utf8).
+      try {
+        let _cj;
+        const wrapCrypto = (cj) => {
+          try {
+            const utf8 = cj && cj.enc && cj.enc.Utf8;
+            for (const algo of ['AES', 'DES', 'TripleDES', 'RC4', 'RC4Drop', 'Rabbit']) {
+              const mod = cj && cj[algo];
+              if (!mod || typeof mod.decrypt !== 'function') continue;
+              const orig = mod.decrypt.bind(mod);
+              mod.decrypt = function (...a) {
+                const r = orig(...a);
+                try { rec(r.toString(utf8)); } catch (e) { /* ignore */ }
+                return r;
+              };
+            }
+          } catch (e) { /* ignore */ }
+        };
+        Object.defineProperty(window, 'CryptoJS', {
+          configurable: true,
+          get() { return _cj; },
+          set(v) { _cj = v; wrapCrypto(v); },
+        });
+      } catch (e) { /* ignore */ }
+
       // Binary -> text (fetch(...).arrayBuffer() then TextDecoder, WebCrypto out).
       try {
         if (window.TextDecoder) {

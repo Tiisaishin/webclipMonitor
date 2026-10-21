@@ -4,6 +4,7 @@ import { fetchAsIphone } from '../crawler/fetcher.js';
 import { runDecoders } from '../crawler/decoders/index.js';
 import { looksLikeWebclip, parseWebclip, urlToDomain } from '../crawler/webclip.js';
 import { resolveUrl, expandHandoff, isFollowable, normalize } from '../crawler/urls.js';
+import { resolveDecodeConfig } from '../crawler/decoders/rules.js';
 import { upsertDomain, checkDomain } from '../domain/service.js';
 
 /**
@@ -15,7 +16,7 @@ import { upsertDomain, checkDomain } from '../domain/service.js';
  * becomes a leaf (we don't crawl past it), and we keep exhausting every other
  * branch up to max_depth. A global node cap guards against runaway trees.
  */
-export async function runScan(run, task, { xorKeys = [] } = {}) {
+export async function runScan(run, task, { decodeConfig = {} } = {}) {
   const visited = new Set();
   const stats = { nodes: 0, webclips: 0, domains: 0, errors: 0 };
   const context = { taskName: task.name, entryUrl: task.entry_url };
@@ -38,7 +39,7 @@ export async function runScan(run, task, { xorKeys = [] } = {}) {
     }
     const batch = queue.splice(0, config.crawl.concurrency);
     const children = await Promise.all(
-      batch.map((item) => processNode(item, { run, task, xorKeys, stats, context }))
+      batch.map((item) => processNode(item, { run, task, decodeConfig, stats, context }))
     );
 
     for (const found of children) {
@@ -56,7 +57,7 @@ export async function runScan(run, task, { xorKeys = [] } = {}) {
   return stats;
 }
 
-async function processNode(item, { run, task, xorKeys, stats, context }) {
+async function processNode(item, { run, task, decodeConfig, stats, context }) {
   stats.nodes++;
   const fetched = await fetchAsIphone(item.url);
 
@@ -123,11 +124,16 @@ async function processNode(item, { run, task, xorKeys, stats, context }) {
   // Redirect chain + runtime sub-requests are the strongest signals.
   const runtimeUrls = [...fetched.redirectChain, ...fetched.subRequests.map((r) => r.url)];
 
+  // Resolve per-domain decode rules for this node's URL.
+  const { xorKeys, aesKeys, extracts } = resolveDecodeConfig(fetched.finalUrl || item.url, decodeConfig);
+
   const candidates = runDecoders({
     body: fetched.body,
     runtimeUrls,
     runtimeDecoded: fetched.runtimeDecoded,
     xorKeys,
+    aesKeys,
+    extracts,
   });
   for (const c of candidates) {
     add(c.url, c.via === 'runtime' || c.via === 'plaintext' ? c.via : 'decoded', c.via);

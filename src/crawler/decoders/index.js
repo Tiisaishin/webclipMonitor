@@ -1,6 +1,8 @@
 import { findUrls } from './util.js';
 import { TRANSFORMS } from './transforms.js';
 import { decodeXor } from './xor.js';
+import { decodeAes } from './aes.js';
+import { applyExtracts } from './rules.js';
 
 const MAX_DEPTH = 3;        // how deep to unwrap nested obfuscation
 const MAX_OUTPUTS = 4000;   // safety cap on decoded fragments per page
@@ -24,7 +26,14 @@ const MAX_OUTPUTS = 4000;   // safety cap on decoded fragments per page
  *
  * @returns {{url: string, via: string}[]}
  */
-export function runDecoders({ body = '', runtimeUrls = [], runtimeDecoded = [], xorKeys = [] }) {
+export function runDecoders({
+  body = '',
+  runtimeUrls = [],
+  runtimeDecoded = [],
+  xorKeys = [],
+  aesKeys = [],
+  extracts = [],
+}) {
   const out = [];
   const seen = new Set();
   const push = (url, via) => {
@@ -43,11 +52,19 @@ export function runDecoders({ body = '', runtimeUrls = [], runtimeDecoded = [], 
     for (const u of findUrls(text)) push(u, 'runtime-sink');
   }
 
-  // 3. Recursive static transforms over the rendered body.
+  // 3. Per-domain rule: custom extract regexes (highest site-specific signal).
+  for (const u of applyExtracts(body, extracts)) push(u, 'rule-extract');
+
+  // 4. Recursive static transforms over the rendered body.
   for (const { url, via } of expand(body)) push(url, via);
 
-  // 4. XOR brute force / known key.
+  // 5. XOR brute force / known key.
   for (const r of decodeXor(body, { extraKeys: xorKeys })) {
+    for (const u of r.urls) push(u, r.via);
+  }
+
+  // 6. Static AES (CryptoJS passphrase mode + rule-supplied raw keys).
+  for (const r of decodeAes(body, { aesKeys })) {
     for (const u of r.urls) push(u, r.via);
   }
 

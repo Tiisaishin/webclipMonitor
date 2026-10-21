@@ -148,6 +148,7 @@ async function loadSettings() {
   f.telegram_bot_token.placeholder = s.telegram_bot_token_set ? `set (${s.telegram_bot_token})` : '123456:ABC…';
   f.expiry_warn_days.value = s.expiry_warn_days || '';
   f.xor_keys.value = s.xor_keys || '';
+  f.decode_rules.value = s.decode_rules || '';
 }
 
 el('#settings-form').addEventListener('submit', async (e) => {

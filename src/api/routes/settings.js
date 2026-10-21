@@ -10,6 +10,7 @@ const ALLOWED = new Set([
   'telegram_chat_id',
   'expiry_warn_days',
   'xor_keys',
+  'decode_rules',
 ]);
 
 // Mask secrets on read.
@@ -32,6 +33,15 @@ settingsRouter.get('/', async (_req, res) => {
 
 settingsRouter.put('/', async (req, res) => {
   const body = req.body || {};
+  // Validate decode_rules is a JSON array before storing.
+  if (body.decode_rules != null && body.decode_rules !== '') {
+    try {
+      const parsed = JSON.parse(body.decode_rules);
+      if (!Array.isArray(parsed)) throw new Error('must be a JSON array');
+    } catch (err) {
+      return res.status(400).json({ error: `decode_rules invalid: ${err.message}` });
+    }
+  }
   const applied = [];
   for (const [key, value] of Object.entries(body)) {
     if (!ALLOWED.has(key)) continue;

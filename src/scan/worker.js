@@ -2,6 +2,7 @@ import { pool, one, query } from '../db/index.js';
 import { runScan } from './orchestrator.js';
 import { closeBrowser } from '../crawler/fetcher.js';
 import { getSetting } from '../settings.js';
+import { parseRules } from '../crawler/decoders/rules.js';
 
 let running = false;
 let stopped = false;
@@ -31,11 +32,12 @@ async function executeRun(run) {
   }
 
   const xorKeysRaw = await getSetting('xor_keys'); // comma-separated optional keys
-  const xorKeys = xorKeysRaw ? xorKeysRaw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const globalXorKeys = xorKeysRaw ? xorKeysRaw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const rules = parseRules(await getSetting('decode_rules'));
 
   console.log(`[worker] run ${run.id} starting: ${task.name} (${task.entry_url}) depth=${task.max_depth}`);
   try {
-    const stats = await runScan(run, task, { xorKeys });
+    const stats = await runScan(run, task, { decodeConfig: { globalXorKeys, rules } });
     await query(
       `UPDATE scan_runs SET status='done', finished_at=now(), stats=$2 WHERE id=$1`,
       [run.id, JSON.stringify(stats)]
