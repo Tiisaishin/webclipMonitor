@@ -1,4 +1,4 @@
-import { one, query } from '../db/index.js';
+import { one, many, query } from '../db/index.js';
 import { config } from '../config.js';
 import { fetchAsIphone } from '../crawler/fetcher.js';
 import { runDecoders } from '../crawler/decoders/index.js';
@@ -31,6 +31,13 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
   }];
   visited.add(normalize(task.entry_url));
 
+  // Site type decides how far we crawl:
+  //   'standalone' (独立站) — one landing page, one target: stop the whole scan
+  //     as soon as the first webclip is found.
+  //   'nav' (导航站, default) — many links: a webclip ends only its own branch,
+  //     and every other branch is exhausted up to max_depth.
+  const standalone = task.site_type === 'standalone';
+
   // Simple bounded-concurrency BFS: drain a layer in parallel batches.
   while (queue.length > 0) {
     if (stats.nodes >= config.crawl.maxNodesPerTask) {
@@ -41,6 +48,12 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
     const children = await Promise.all(
       batch.map((item) => processNode(item, { run, task, decodeConfig, stats, context }))
     );
+
+    // Standalone site: first webclip is the answer — stop here.
+    if (standalone && stats.webclips > 0) {
+      console.log(`[scan] run ${run.id} standalone: stopping after first webclip`);
+      break;
+    }
 
     for (const found of children) {
       for (const child of found) {
@@ -144,11 +157,39 @@ async function processNode(item, { run, task, decodeConfig, stats, context }) {
 
 async function ingestWebclip(nodeId, fetched, { task, stats, context }) {
   const parsed = parseWebclip({ buffer: fetched.buffer, body: fetched.body });
+
+  // Reconstruct the full scan path (entry -> … -> this webclip) by walking
+  // parent links, so each webclip records how it was reached.
+  const pathRows = await many(
+    `WITH RECURSIVE anc AS (
+       SELECT id, parent_id, url, final_url, title, discovery_method, decoded_via, depth
+         FROM scan_nodes WHERE id = $1
+       UNION ALL
+       SELECT n.id, n.parent_id, n.url, n.final_url, n.title, n.discovery_method, n.decoded_via, n.depth
+         FROM scan_nodes n JOIN anc a ON n.id = a.parent_id
+     )
+     SELECT * FROM anc ORDER BY depth ASC`,
+    [nodeId]
+  );
+  const path = pathRows.map((r) => ({
+    depth: r.depth,
+    url: r.final_url || r.url,
+    title: r.title || null,
+    discovery: r.discovery_method || null,
+    decodedVia: r.decoded_via || null,
+  }));
+  // The landing page is the webclip node's parent (the page that offered the
+  // profile); if the webclip is the entry itself, fall back to the node.
+  const landing = pathRows.length > 1 ? pathRows[pathRows.length - 2] : pathRows[pathRows.length - 1];
+  const landingUrl = landing ? (landing.final_url || landing.url) : null;
+  const landingTitle = landing ? landing.title : null;
+
   const clip = await one(
-    `INSERT INTO webclips (node_id, signed, label, raw_size)
-     VALUES ($1,$2,$3,$4) RETURNING id`,
+    `INSERT INTO webclips (node_id, signed, label, raw_size, landing_url, landing_title, path)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [nodeId, parsed?.signed || false, parsed?.label || null,
-     fetched.buffer ? fetched.buffer.length : (fetched.body ? fetched.body.length : null)]
+     fetched.buffer ? fetched.buffer.length : (fetched.body ? fetched.body.length : null),
+     landingUrl, landingTitle, JSON.stringify(path)]
   );
 
   if (!parsed) return;
@@ -165,7 +206,8 @@ async function ingestWebclip(nodeId, fetched, { task, stats, context }) {
       [clip.id, domainId, fullUrl]
     );
     if (domainId) {
-      await checkDomain(domainId, { ...context, webclipUrl: fullUrl });
+      // Pass landing page + title into the alert context too.
+      await checkDomain(domainId, { ...context, webclipUrl: fullUrl, landingUrl, landingTitle });
     }
   }
 }

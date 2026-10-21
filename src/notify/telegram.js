@@ -36,15 +36,17 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export function formatExpiryAlert({ domain, expiry, status, taskName, entryUrl, webclipUrl }) {
+export function formatExpiryAlert({ domain, expiry, status, taskName, entryUrl, webclipUrl, landingUrl, landingTitle }) {
   const when = expiry ? new Date(expiry).toISOString().slice(0, 10) : 'unknown';
-  const head = status === 'expired' ? '🔴 Domain EXPIRED' : '🟠 Domain expiring soon';
+  const head = status === 'expired' ? '🔴 域名已过期' : '🟠 域名即将过期';
   return [
     `<b>${head}</b>`,
-    `Domain: <code>${esc(domain)}</code>`,
-    `Expiry: <b>${esc(when)}</b>`,
-    taskName ? `Task: ${esc(taskName)}` : null,
-    entryUrl ? `Entry: ${esc(entryUrl)}` : null,
+    `域名: <code>${esc(domain)}</code>`,
+    `到期: <b>${esc(when)}</b>`,
+    taskName ? `任务: ${esc(taskName)}` : null,
+    entryUrl ? `入口: ${esc(entryUrl)}` : null,
+    landingTitle ? `落地页标题: ${esc(landingTitle)}` : null,
+    landingUrl ? `落地页: ${esc(landingUrl)}` : null,
     webclipUrl ? `Webclip URL: ${esc(webclipUrl)}` : null,
   ].filter(Boolean).join('\n');
 }

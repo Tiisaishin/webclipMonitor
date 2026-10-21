@@ -22,6 +22,7 @@ resultsRouter.get('/runs/:runId/tree', async (req, res) => {
 resultsRouter.get('/runs/:runId/webclips', async (req, res) => {
   const rows = await many(
     `SELECT w.id, w.signed, w.label, n.url AS source_url, n.title AS source_title,
+            w.landing_url, w.landing_title, w.path,
             u.full_url, d.domain, d.expiry_date, d.status
        FROM webclips w
        JOIN scan_nodes n ON n.id = w.node_id
@@ -34,13 +35,25 @@ resultsRouter.get('/runs/:runId/webclips', async (req, res) => {
   res.json(rows);
 });
 
-// All tracked domains, newest/expiring first.
+// All tracked domains, newest/expiring first, each with its most recent
+// source: the full webclip URL, the landing page + title, and the scan path.
 resultsRouter.get('/domains', async (_req, res) => {
   const rows = await many(`
-    SELECT * FROM domains
-    ORDER BY CASE status WHEN 'expired' THEN 0 WHEN 'expiring' THEN 1
-                         WHEN 'active' THEN 2 ELSE 3 END,
-             expiry_date NULLS LAST
+    SELECT d.*, s.full_url, s.landing_url, s.landing_title, s.path, s.entry_url
+      FROM domains d
+      LEFT JOIN LATERAL (
+        SELECT u.full_url, w.landing_url, w.landing_title, w.path, t.entry_url
+          FROM webclip_urls u
+          JOIN webclips w ON w.id = u.webclip_id
+          JOIN scan_nodes n ON n.id = w.node_id
+          JOIN scan_runs r ON r.id = n.run_id
+          JOIN scan_tasks t ON t.id = r.task_id
+         WHERE u.domain_id = d.id
+         ORDER BY u.id DESC LIMIT 1
+      ) s ON true
+    ORDER BY CASE d.status WHEN 'expired' THEN 0 WHEN 'expiring' THEN 1
+                           WHEN 'active' THEN 2 ELSE 3 END,
+             d.expiry_date NULLS LAST
   `);
   res.json(rows);
 });

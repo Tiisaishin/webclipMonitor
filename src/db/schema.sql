@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS scan_tasks (
   name           TEXT NOT NULL,
   entry_url      TEXT NOT NULL,
   max_depth      INT  NOT NULL DEFAULT 5,
+  -- 'nav' (导航站, exhaust all branches) | 'standalone' (独立站, stop at first webclip)
+  site_type      TEXT NOT NULL DEFAULT 'nav',
   -- NULL = one-off; otherwise a standard 5-field cron expression for rescans
   cron           TEXT,
   enabled        BOOLEAN NOT NULL DEFAULT true,
@@ -49,6 +51,9 @@ CREATE TABLE IF NOT EXISTS scan_nodes (
   fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Added after initial release.
+ALTER TABLE scan_tasks ADD COLUMN IF NOT EXISTS site_type TEXT NOT NULL DEFAULT 'nav';
+
 -- Landing-page metadata captured per node (added after initial release).
 ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS title TEXT;
 ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS description TEXT;
@@ -66,6 +71,13 @@ CREATE TABLE IF NOT EXISTS webclips (
   raw_size    INT,
   parsed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Snapshot of the landing page + full scan path, recorded with each webclip
+-- so the key info doesn't require walking the tree later (added after release).
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS landing_url TEXT;
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS landing_title TEXT;
+-- Ordered array (root -> webclip) of {depth,url,title,discovery,decodedVia}.
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS path JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_webclips_node ON webclips(node_id);
 
