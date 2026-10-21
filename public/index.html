@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebClip Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>📎 WebClip Monitor</h1>
+    <nav>
+      <button data-tab="tasks" class="active">Tasks</button>
+      <button data-tab="domains">Domains</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TASKS -->
+    <section id="tasks" class="tab active">
+      <div class="card">
+        <h2>New scan task</h2>
+        <form id="task-form" class="grid">
+          <label>Name <input name="name" required placeholder="Campaign A" /></label>
+          <label>Entry URL <input name="entry_url" required placeholder="https://example.com/lp" /></label>
+          <label>Max depth <input name="max_depth" type="number" value="5" min="1" max="20" /></label>
+          <label>Cron (optional, for rescans)
+            <input name="cron" placeholder="0 */6 * * *" />
+          </label>
+          <button type="submit">Create</button>
+        </form>
+        <p class="hint">Leave cron empty for a one-off task. Example: <code>0 */6 * * *</code> = every 6 hours.</p>
+      </div>
+
+      <div class="card">
+        <h2>Tasks</h2>
+        <table id="task-table">
+          <thead><tr>
+            <th>Name</th><th>Entry</th><th>Depth</th><th>Cron</th>
+            <th>Last run</th><th>Enabled</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card" id="run-detail" hidden>
+        <h2>Run <span id="run-id"></span></h2>
+        <div id="run-webclips"></div>
+        <h3>Crawl tree</h3>
+        <div id="run-tree" class="tree"></div>
+      </div>
+    </section>
+
+    <!-- DOMAINS -->
+    <section id="domains" class="tab">
+      <div class="card">
+        <h2>Tracked domains</h2>
+        <table id="domain-table">
+          <thead><tr>
+            <th>Domain</th><th>Status</th><th>Expiry</th><th>Registrar</th>
+            <th>Last checked</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="tab">
+      <div class="card">
+        <h2>Telegram & alerts</h2>
+        <form id="settings-form" class="grid">
+          <label>Telegram bot token <input name="telegram_bot_token" placeholder="123456:ABC…" /></label>
+          <label>Telegram chat id <input name="telegram_chat_id" placeholder="-1001234567890" /></label>
+          <label>Warn N days before expiry <input name="expiry_warn_days" type="number" min="1" /></label>
+          <label>Known XOR keys (comma separated, optional)
+            <input name="xor_keys" placeholder="mykey,0xAB" />
+          </label>
+          <div class="row">
+            <button type="submit">Save</button>
+            <button type="button" id="tg-test">Send test message</button>
+          </div>
+        </form>
+        <p class="hint" id="settings-status"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
