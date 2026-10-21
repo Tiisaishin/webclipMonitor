@@ -72,6 +72,13 @@ CREATE TABLE IF NOT EXISTS webclips (
   parsed_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Snapshot of the landing page + full scan path, recorded with each webclip
+-- so the key info doesn't require walking the tree later (added after release).
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS landing_url TEXT;
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS landing_title TEXT;
+-- Ordered array (root -> webclip) of {depth,url,title,discovery,decodedVia}.
+ALTER TABLE webclips ADD COLUMN IF NOT EXISTS path JSONB;
+
 CREATE INDEX IF NOT EXISTS idx_webclips_node ON webclips(node_id);
 
 -- Registrable domains. Deduplicated across all tasks/runs.

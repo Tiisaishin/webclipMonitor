@@ -41,6 +41,25 @@ const fmtStats = (st) => {
   return `节点 ${st.nodes ?? 0} · webclip ${st.webclips ?? 0} · 域名 ${st.domains ?? 0} · 错误 ${st.errors ?? 0}`;
 };
 
+// Short label for a path hop: its title, else the URL's host + last segment.
+const hopLabel = (hop) => {
+  if (hop.title) return hop.title;
+  try {
+    const u = new URL(hop.url);
+    const seg = u.pathname.split('/').filter(Boolean).pop();
+    return seg ? `${u.host}/${seg}` : u.host;
+  } catch { return (hop.url || '').slice(0, 24); }
+};
+
+// Render the scan path (entry → … → webclip) as an arrow chain with a full
+// tooltip. `path` is the JSONB array stored on the webclip.
+const fmtPath = (path) => {
+  if (!Array.isArray(path) || path.length === 0) return '—';
+  const chain = path.map(hopLabel).join(' → ');
+  const full = path.map((h, i) => `${i}. ${h.url}${h.decodedVia ? ` [${h.decodedVia}]` : ''}`).join('\n');
+  return `<span title="${esc(full)}">${esc(chain.length > 70 ? chain.slice(0, 70) + '…' : chain)}</span>`;
+};
+
 // --- Tabs ---
 document.querySelectorAll('nav button').forEach((b) => {
   b.addEventListener('click', () => {
@@ -106,13 +125,14 @@ async function showRun(runId) {
   ]);
 
   el('#run-webclips').innerHTML = webclips.length
-    ? `<table><thead><tr><th>域名</th><th>状态</th><th>到期日</th><th>完整 URL</th><th>来源页</th><th>签名</th></tr></thead><tbody>${
+    ? `<table><thead><tr><th>域名</th><th>状态</th><th>到期日</th><th>完整 URL</th><th>落地页</th><th>扫描路径</th><th>签名</th></tr></thead><tbody>${
         webclips.map((w) => `<tr>
           <td>${esc(w.domain || '—')}</td>
           <td>${badge(w.status)}</td>
           <td>${w.expiry_date ? new Date(w.expiry_date).toISOString().slice(0, 10) : '—'}</td>
-          <td><a href="${esc(w.full_url)}" target="_blank" rel="noopener">${esc((w.full_url || '').slice(0, 50))}</a></td>
-          <td title="${esc(w.source_url || '')}">${esc(w.source_title || (w.source_url || '').slice(0, 40))}</td>
+          <td><a href="${esc(w.full_url)}" target="_blank" rel="noopener">${esc((w.full_url || '').slice(0, 44))}</a></td>
+          <td title="${esc(w.landing_url || '')}">${esc(w.landing_title || (w.landing_url || '').slice(0, 36) || '—')}</td>
+          <td class="pathcell">${fmtPath(w.path)}</td>
           <td>${w.signed ? '🔏' : ''}</td>
         </tr>`).join('')
       }</tbody></table>`
@@ -149,10 +169,13 @@ async function loadDomains() {
     <td>${esc(d.domain)}</td>
     <td>${badge(d.status)}</td>
     <td>${d.expiry_date ? new Date(d.expiry_date).toISOString().slice(0, 10) : '—'}</td>
+    <td>${d.full_url ? `<a href="${esc(d.full_url)}" target="_blank" rel="noopener" title="${esc(d.full_url)}">${esc(d.full_url.slice(0, 40))}</a>` : '—'}</td>
+    <td title="${esc(d.landing_url || '')}">${esc(d.landing_title || (d.landing_url || '').slice(0, 32) || '—')}</td>
+    <td class="pathcell">${fmtPath(d.path)}</td>
     <td>${esc(d.registrar || '—')}</td>
     <td>${fmtDate(d.last_checked_at)}</td>
     <td class="actions"><button class="ghost" data-check="${d.id}">重新检查</button></td>
-  </tr>`).join('') || '<tr><td colspan="6" class="hint">暂无域名。</td></tr>';
+  </tr>`).join('') || '<tr><td colspan="9" class="hint">暂无域名。</td></tr>';
   tbody.querySelectorAll('[data-check]').forEach((b) =>
     b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.check}/check`); loadDomains(); }));
 }

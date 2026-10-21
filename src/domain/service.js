@@ -72,6 +72,8 @@ async function maybeNotify(domainId, domain, expiry, status, context) {
     taskName: context.taskName,
     entryUrl: context.entryUrl,
     webclipUrl: context.webclipUrl,
+    landingUrl: context.landingUrl,
+    landingTitle: context.landingTitle,
   });
 
   const res = await sendTelegram(text);

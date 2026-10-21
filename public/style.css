@@ -71,4 +71,5 @@ td a { color: var(--accent); text-decoration: none; }
 .tree .err { color: var(--red); }
 .tree .via { color: var(--muted); }
 .tree .title { color: var(--accent); }
+.pathcell { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); max-width: 320px; }
 .actions button { padding: 5px 9px; font-size: 12px; margin-left: 6px; }
