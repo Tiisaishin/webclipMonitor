@@ -1,10 +1,10 @@
 import { one, query } from './db/index.js';
 import { config } from './config.js';
 
-// Settings live in the DB (editable via the web admin) and fall back to env.
+// Settings live in the DB (editable via the web admin). Telegram credentials
+// are web-admin only — no env fallback. Only the expiry warn window falls back
+// to its env-derived default.
 const ENV_FALLBACK = {
-  telegram_bot_token: config.telegram.botToken,
-  telegram_chat_id: config.telegram.chatId,
   expiry_warn_days: String(config.domain.expiryWarnDays),
 };
 

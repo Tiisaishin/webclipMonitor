@@ -166,11 +166,10 @@ Two resources created **separately** in the dashboard — no `render.yaml`:
 - Instance type: **Free**.
 - **Environment variables:**
   - `DATABASE_URL` = the Postgres **Internal Database URL** from step 1.
-  - (optional) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` — or set them later in
-    the web admin.
   - If you ever point it at an **External** database URL instead, also set
     `DATABASE_SSL=true`.
   - Do **not** set `PORT` — Render injects it, and the app honours it.
+  - **Telegram is configured in the web admin (Settings page), not via env.**
 - **Health check path:** `/api/health`.
 - Create. The schema migrates automatically on first boot.
 
@@ -195,9 +194,9 @@ See `.env.example`. Notable settings:
 - `DOMAIN_RECHECK_HOURS` — how often a domain is re-queried.
 - `EXPIRY_WARN_DAYS` — lead time for "expiring soon" alerts.
 
-Telegram token/chat id, the warn window, and optional known XOR keys can also be
-set at runtime from the **Settings** tab (stored in the `settings` table,
-overriding env).
+Telegram token/chat id is configured **only** from the **Settings** tab (stored
+in the `settings` table, no env fallback). The warn window and optional known
+XOR keys / decode rules can also be set there.
 
 ## Per-domain decode rules
 

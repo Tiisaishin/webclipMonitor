@@ -21,9 +21,7 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/webclip_monitor
       PORT: "3000"
-      # Optional: set these here or in the web admin.
-      # TELEGRAM_BOT_TOKEN: ""
-      # TELEGRAM_CHAT_ID: ""
+      # Telegram is configured in the web admin (Settings page), not here.
     ports:
       - "3000:3000"
     depends_on:
