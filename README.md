@@ -150,6 +150,8 @@ runs the schema migration on boot. It listens on `$PORT` (default 3000).
 
 ### Render (free tier, no Blueprint)
 
+> 详细中文图文教程见 [`docs/deploy-render.md`](docs/deploy-render.md)。
+
 Two resources created **separately** in the dashboard — no `render.yaml`:
 
 **1. PostgreSQL**
