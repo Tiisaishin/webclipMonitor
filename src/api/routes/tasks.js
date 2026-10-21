@@ -20,8 +20,10 @@ tasksRouter.get('/', async (_req, res) => {
   res.json(rows);
 });
 
+const SITE_TYPES = new Set(['nav', 'standalone']);
+
 tasksRouter.post('/', async (req, res) => {
-  const { name, entry_url, max_depth, cron: cronExpr } = req.body || {};
+  const { name, entry_url, max_depth, cron: cronExpr, site_type } = req.body || {};
   if (!name || !entry_url) {
     return res.status(400).json({ error: 'name and entry_url are required' });
   }
@@ -33,19 +35,25 @@ tasksRouter.post('/', async (req, res) => {
   if (cronExpr && !cron.validate(cronExpr)) {
     return res.status(400).json({ error: 'invalid cron expression' });
   }
+  if (site_type && !SITE_TYPES.has(site_type)) {
+    return res.status(400).json({ error: "site_type must be 'nav' or 'standalone'" });
+  }
   const depth = Number.parseInt(max_depth, 10);
   const row = await one(
-    `INSERT INTO scan_tasks (name, entry_url, max_depth, cron)
-     VALUES ($1,$2,$3,$4) RETURNING *`,
-    [name, entry_url, Number.isFinite(depth) ? depth : 5, cronExpr || null]
+    `INSERT INTO scan_tasks (name, entry_url, max_depth, site_type, cron)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [name, entry_url, Number.isFinite(depth) ? depth : 5, site_type || 'nav', cronExpr || null]
   );
   res.status(201).json(row);
 });
 
 tasksRouter.patch('/:id', async (req, res) => {
-  const { name, entry_url, max_depth, cron: cronExpr, enabled } = req.body || {};
+  const { name, entry_url, max_depth, cron: cronExpr, enabled, site_type } = req.body || {};
   if (cronExpr && !cron.validate(cronExpr)) {
     return res.status(400).json({ error: 'invalid cron expression' });
+  }
+  if (site_type && !SITE_TYPES.has(site_type)) {
+    return res.status(400).json({ error: "site_type must be 'nav' or 'standalone'" });
   }
   const row = await one(
     `UPDATE scan_tasks SET
@@ -53,11 +61,12 @@ tasksRouter.patch('/:id', async (req, res) => {
        entry_url = COALESCE($3, entry_url),
        max_depth = COALESCE($4, max_depth),
        cron = COALESCE($5, cron),
-       enabled = COALESCE($6, enabled)
+       enabled = COALESCE($6, enabled),
+       site_type = COALESCE($7, site_type)
      WHERE id = $1 RETURNING *`,
     [req.params.id, name ?? null, entry_url ?? null,
      Number.isFinite(Number.parseInt(max_depth, 10)) ? Number.parseInt(max_depth, 10) : null,
-     cronExpr ?? null, typeof enabled === 'boolean' ? enabled : null]
+     cronExpr ?? null, typeof enabled === 'boolean' ? enabled : null, site_type ?? null]
   );
   if (!row) return res.status(404).json({ error: 'not found' });
   res.json(row);

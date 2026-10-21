@@ -31,6 +31,13 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
   }];
   visited.add(normalize(task.entry_url));
 
+  // Site type decides how far we crawl:
+  //   'standalone' (独立站) — one landing page, one target: stop the whole scan
+  //     as soon as the first webclip is found.
+  //   'nav' (导航站, default) — many links: a webclip ends only its own branch,
+  //     and every other branch is exhausted up to max_depth.
+  const standalone = task.site_type === 'standalone';
+
   // Simple bounded-concurrency BFS: drain a layer in parallel batches.
   while (queue.length > 0) {
     if (stats.nodes >= config.crawl.maxNodesPerTask) {
@@ -41,6 +48,12 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
     const children = await Promise.all(
       batch.map((item) => processNode(item, { run, task, decodeConfig, stats, context }))
     );
+
+    // Standalone site: first webclip is the answer — stop here.
+    if (standalone && stats.webclips > 0) {
+      console.log(`[scan] run ${run.id} standalone: stopping after first webclip`);
+      break;
+    }
 
     for (const found of children) {
       for (const child of found) {

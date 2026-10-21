@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS scan_tasks (
   name           TEXT NOT NULL,
   entry_url      TEXT NOT NULL,
   max_depth      INT  NOT NULL DEFAULT 5,
+  -- 'nav' (导航站, exhaust all branches) | 'standalone' (独立站, stop at first webclip)
+  site_type      TEXT NOT NULL DEFAULT 'nav',
   -- NULL = one-off; otherwise a standard 5-field cron expression for rescans
   cron           TEXT,
   enabled        BOOLEAN NOT NULL DEFAULT true,
@@ -48,6 +50,9 @@ CREATE TABLE IF NOT EXISTS scan_nodes (
   error             TEXT,
   fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Added after initial release.
+ALTER TABLE scan_tasks ADD COLUMN IF NOT EXISTS site_type TEXT NOT NULL DEFAULT 'nav';
 
 -- Landing-page metadata captured per node (added after initial release).
 ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS title TEXT;

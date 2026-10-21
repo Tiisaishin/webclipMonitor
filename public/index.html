@@ -1,89 +1,99 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WebClip Monitor</title>
+  <title>WebClip 监控</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
-    <h1>📎 WebClip Monitor</h1>
+    <h1>📎 WebClip 监控</h1>
     <nav>
-      <button data-tab="tasks" class="active">Tasks</button>
-      <button data-tab="domains">Domains</button>
-      <button data-tab="settings">Settings</button>
+      <button data-tab="tasks" class="active">扫描任务</button>
+      <button data-tab="domains">域名</button>
+      <button data-tab="settings">设置</button>
     </nav>
   </header>
 
   <main>
-    <!-- TASKS -->
+    <!-- 任务 -->
     <section id="tasks" class="tab active">
       <div class="card">
-        <h2>New scan task</h2>
+        <h2>新建扫描任务</h2>
         <form id="task-form" class="grid">
-          <label>Name <input name="name" required placeholder="Campaign A" /></label>
-          <label>Entry URL <input name="entry_url" required placeholder="https://example.com/lp" /></label>
-          <label>Max depth <input name="max_depth" type="number" value="5" min="1" max="20" /></label>
-          <label>Cron (optional, for rescans)
+          <label>名称 <input name="name" required placeholder="活动 A" /></label>
+          <label>入口 URL <input name="entry_url" required placeholder="https://example.com/lp" /></label>
+          <label>站点类型
+            <select name="site_type">
+              <option value="nav">导航站（穷尽所有分支）</option>
+              <option value="standalone">独立站（找到一个即停）</option>
+            </select>
+          </label>
+          <label>最大深度 <input name="max_depth" type="number" value="5" min="1" max="20" /></label>
+          <label>定时重扫 Cron（可选）
             <input name="cron" placeholder="0 */6 * * *" />
           </label>
-          <button type="submit">Create</button>
+          <button type="submit">创建</button>
         </form>
-        <p class="hint">Leave cron empty for a one-off task. Example: <code>0 */6 * * *</code> = every 6 hours.</p>
+        <p class="hint">
+          一次性任务请留空 Cron。示例：<code>0 */6 * * *</code> = 每 6 小时。<br />
+          <b>导航站</b>：有很多外链，每条线挖到 webclip 就停该线，但穷尽所有线。
+          <b>独立站</b>：只有一个落地页目标，挖到第一个 webclip 整个任务即停。
+        </p>
       </div>
 
       <div class="card">
-        <h2>Tasks</h2>
+        <h2>任务列表</h2>
         <table id="task-table">
           <thead><tr>
-            <th>Name</th><th>Entry</th><th>Depth</th><th>Cron</th>
-            <th>Last run</th><th>Enabled</th><th></th>
+            <th>名称</th><th>入口</th><th>类型</th><th>深度</th><th>Cron</th>
+            <th>最近运行</th><th>启用</th><th></th>
           </tr></thead>
           <tbody></tbody>
         </table>
       </div>
 
       <div class="card" id="run-detail" hidden>
-        <h2>Run <span id="run-id"></span></h2>
+        <h2>运行 <span id="run-id"></span></h2>
         <div id="run-webclips"></div>
-        <h3>Crawl tree</h3>
+        <h3>爬取树</h3>
         <div id="run-tree" class="tree"></div>
       </div>
     </section>
 
-    <!-- DOMAINS -->
+    <!-- 域名 -->
     <section id="domains" class="tab">
       <div class="card">
-        <h2>Tracked domains</h2>
+        <h2>监控中的域名</h2>
         <table id="domain-table">
           <thead><tr>
-            <th>Domain</th><th>Status</th><th>Expiry</th><th>Registrar</th>
-            <th>Last checked</th><th></th>
+            <th>域名</th><th>状态</th><th>到期日</th><th>注册商</th>
+            <th>最近检查</th><th></th>
           </tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </section>
 
-    <!-- SETTINGS -->
+    <!-- 设置 -->
     <section id="settings" class="tab">
       <div class="card">
-        <h2>Telegram & alerts</h2>
+        <h2>Telegram 与告警</h2>
         <form id="settings-form" class="grid">
-          <label>Telegram bot token <input name="telegram_bot_token" placeholder="123456:ABC…" /></label>
-          <label>Telegram chat id <input name="telegram_chat_id" placeholder="-1001234567890" /></label>
-          <label>Warn N days before expiry <input name="expiry_warn_days" type="number" min="1" /></label>
-          <label>Known XOR keys (comma separated, optional)
+          <label>Telegram Bot Token <input name="telegram_bot_token" placeholder="123456:ABC…" /></label>
+          <label>Telegram Chat ID <input name="telegram_chat_id" placeholder="-1001234567890" /></label>
+          <label>到期前多少天预警 <input name="expiry_warn_days" type="number" min="1" /></label>
+          <label>已知 XOR Key（逗号分隔，可选）
             <input name="xor_keys" placeholder="mykey,0xAB" />
           </label>
-          <label class="full">Per-domain decode rules (JSON array, optional)
+          <label class="full">每域名解码规则（JSON 数组，可选）
             <textarea name="decode_rules" rows="8" spellcheck="false"
               placeholder='[{"match":"example\\.com","aesKeys":[{"passphrase":"s3cret"}],"xorKeys":["0x5a"],"extract":"data-url=\"([^\"]+)\""}]'></textarea>
           </label>
           <div class="row">
-            <button type="submit">Save</button>
-            <button type="button" id="tg-test">Send test message</button>
+            <button type="submit">保存</button>
+            <button type="button" id="tg-test">发送测试消息</button>
           </div>
         </form>
         <p class="hint" id="settings-status"></p>
