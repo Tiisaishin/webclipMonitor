@@ -53,9 +53,9 @@
    |-----|-------|------|
    | `DATABASE_URL` | 第 1 步复制的 **Internal Database URL** | 必填 |
    | `CRAWL_CONCURRENCY` | `2` | 免费只有 512MB 内存，Chromium 吃内存，建议 1–2 |
-   | `TELEGRAM_BOT_TOKEN` | 你的 bot token | 可选，也可之后在后台「设置」里填 |
-   | `TELEGRAM_CHAT_ID` | 你的 chat id | 可选，同上 |
 
+   - **Telegram 不在这里配**：bot token 和 chat id 部署后在**后台「设置」页**填写
+     （见第 3 步），不要放进环境变量。
    - **不要设置 `PORT`**：Render 会自动注入，应用会读取它。
    - 只有当你改用 **External** 数据库地址时，才额外加 `DATABASE_SSL=true`；用
      Internal 地址不用加。
@@ -76,8 +76,8 @@
    （`[migrate] schema applied` 说明数据库表已自动建好。）
 2. 打开 Render 分配的地址（形如 `https://webclip-monitor.onrender.com`），
    能看到中文后台界面。
-3. 进 **设置** 页填写 Telegram（或确认环境变量已生效），点 **发送测试消息**，
-   确认 Telegram 能收到。
+3. 进 **设置** 页填写 **Telegram Bot Token** 和 **Chat ID**，点 **保存**，再点
+   **发送测试消息**，确认 Telegram 能收到。（Telegram 只在这里配置，不走环境变量。）
 4. 回 **扫描任务** 页，新建一个任务试跑。
 
 ---

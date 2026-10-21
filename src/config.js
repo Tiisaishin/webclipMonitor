@@ -43,8 +43,5 @@ export const config = {
     enabled: bool('ENABLE_SCHEDULER', true),
   },
 
-  telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    chatId: process.env.TELEGRAM_CHAT_ID || '',
-  },
+  // Telegram is configured only via the web admin (settings table), not env.
 };
