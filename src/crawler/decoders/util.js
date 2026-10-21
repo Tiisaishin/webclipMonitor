@@ -13,7 +13,9 @@ export function findUrls(text) {
     const matches = text.match(re);
     if (matches) matches.forEach((m) => out.add(m.trim()));
   }
-  return [...out];
+  // Drop tokens that are still percent-encoded (e.g. "https%3A%2F%2F...") — the
+  // decoded form is produced separately by the percent transform.
+  return [...out].filter((u) => !/%(?:3a|2f)/i.test(u));
 }
 
 // Does a decoded blob look like it carries something worth following?

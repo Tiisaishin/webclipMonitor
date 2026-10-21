@@ -66,4 +66,5 @@ td a { color: var(--accent); text-decoration: none; }
 .tree .clip { color: var(--green); }
 .tree .err { color: var(--red); }
 .tree .via { color: var(--muted); }
+.tree .title { color: var(--accent); }
 .actions button { padding: 5px 9px; font-size: 12px; margin-left: 6px; }

@@ -13,11 +13,26 @@ Given an entry URL, the crawler walks the discovery tree **exhaustively**:
    Playwright iPhone device profile (mobile UA, viewport, touch) plus iOS Safari
    headers, so device-sniffing landing pages behave as they would on a phone.
 2. **Discover next hops** from HTTP/JS redirects, runtime sub-requests, links,
-   and iframes.
-3. **Decode payloads.** A decoder chain handles plaintext, base64/hex,
-   URL/unicode escaping, and XOR (single-byte brute force + known keys). Because
-   pages are executed in a real browser, most runtime obfuscation is resolved
-   simply by observing where the JS actually navigates.
+   and iframes. Each visited page's URL, final (post-redirect) URL, `<title>`,
+   and meta description are recorded.
+3. **Decode payloads.** Obfuscation is handled two complementary ways:
+   - **Runtime sink hooks.** Before each page's scripts run, the common
+     decode/decrypt sinks (`atob`, `String.fromCharCode`/`fromCodePoint`,
+     `decodeURIComponent`, `unescape`, the `Function` constructor,
+     `TextDecoder.decode`) are wrapped so the plaintext they produce at runtime
+     is captured. This recovers targets from **AES/RC4/custom crypto** whose key
+     lives in the page, without needing the key — we just read what the page
+     decrypts.
+   - **Recursive static decoder chain**, auto-detected by validation (a layer is
+     kept only if it yields a plausible URL). Covers base64 / base64url /
+     base32 / base58 / hex, percent-encoding, HTML entities, `\u`/`\x`/octal JS
+     escapes, `String.fromCharCode(...)`, char-code arrays, string reversal,
+     ROT13/ROT47, and gzip/deflate/brotli — composed recursively, so layered
+     schemes (e.g. `percent → base64 → gzip`) unwrap on their own. XOR
+     (single-byte brute force + configured keys) runs alongside.
+
+   Because pages also execute in a real browser, runtime redirects and the URLs
+   the JS actually requests are captured directly.
 4. **Detect & parse webclips.** When a node is an Apple config profile
    (by content-type, `.mobileconfig` suffix, or `com.apple.webClip.managed`
    payload), it's parsed — including unwrapping PKCS#7-signed profiles — and the
@@ -59,8 +74,9 @@ Key modules:
 
 | Path | Responsibility |
 |------|----------------|
-| `src/crawler/fetcher.js` | iPhone-emulated Playwright fetch; captures redirect chain + sub-requests |
-| `src/crawler/decoders/` | plaintext / encoding / xor decoders + runtime URL harvesting |
+| `src/crawler/fetcher.js` | iPhone-emulated Playwright fetch; captures redirect chain, sub-requests, DOM links, page title/description, and runtime-decoded plaintext via sink hooks |
+| `src/crawler/decoders/transforms.js` | the static transform registry (base64/32/58, hex, percent, entities, escapes, fromCharCode, char-array, reverse, rot, gzip/deflate/brotli) |
+| `src/crawler/decoders/` | recursive decoder pipeline + XOR + runtime-sink URL harvesting |
 | `src/crawler/webclip.js` | webclip detection, PKCS7 unwrap, plist parse, URL→domain |
 | `src/crawler/urls.js` | URL resolve / normalize / dedup / hand-off scheme expansion |
 | `src/scan/orchestrator.js` | exhaustive BFS crawl tree, node cap, webclip-as-leaf |

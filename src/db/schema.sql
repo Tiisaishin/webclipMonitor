@@ -49,6 +49,11 @@ CREATE TABLE IF NOT EXISTS scan_nodes (
   fetched_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Landing-page metadata captured per node (added after initial release).
+ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE scan_nodes ADD COLUMN IF NOT EXISTS final_url TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_scan_nodes_run ON scan_nodes(run_id);
 CREATE INDEX IF NOT EXISTS idx_scan_nodes_parent ON scan_nodes(parent_id);
 

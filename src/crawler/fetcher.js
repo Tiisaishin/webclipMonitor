@@ -34,6 +34,66 @@ export async function closeBrowser() {
 // (viewport, deviceScaleFactor, mobile UA, touch). We layer a couple of extra
 // iOS Safari headers on top so the landing page's device sniffing sees an
 // iPhone end to end.
+// Injected into every page/frame BEFORE its scripts run. Wraps the common
+// decode/decrypt "sinks" so we capture the plaintext a landing page produces at
+// runtime — regardless of the scheme (base64, char-code, percent, or AES/RC4/
+// custom crypto whose output flows through one of these). Captured strings are
+// read back after load and scanned for URLs. All wrappers are transparent
+// (call the original, return its result) and failure-tolerant.
+function sinkHookScript() {
+  return () => {
+    try {
+      const store = [];
+      Object.defineProperty(window, '__wcm_decoded', { get: () => store, configurable: true });
+      const rec = (v) => {
+        try {
+          if (typeof v === 'string' && v.length > 3 && v.length < 200000 && store.length < 5000) {
+            store.push(v);
+          }
+        } catch (e) { /* ignore */ }
+      };
+      const wrap = (obj, name, transform) => {
+        try {
+          const orig = obj[name];
+          if (typeof orig !== 'function') return;
+          obj[name] = function (...args) {
+            const r = orig.apply(this, args);
+            try { rec(transform ? transform(r, args) : r); } catch (e) { /* ignore */ }
+            return r;
+          };
+        } catch (e) { /* ignore */ }
+      };
+      wrap(window, 'atob');
+      wrap(window, 'decodeURIComponent');
+      wrap(window, 'unescape');
+      wrap(window, 'decodeURI');
+      wrap(String, 'fromCharCode');
+      wrap(String, 'fromCodePoint');
+      // Packed/obfuscated JS reveals its source when handed to Function(...).
+      try {
+        const _Function = window.Function;
+        const Wrapped = function (...args) {
+          try { rec(args.join(' ')); } catch (e) { /* ignore */ }
+          return _Function.apply(this, args);
+        };
+        Wrapped.prototype = _Function.prototype;
+        window.Function = Wrapped;
+      } catch (e) { /* ignore */ }
+      // Binary -> text (fetch(...).arrayBuffer() then TextDecoder, WebCrypto out).
+      try {
+        if (window.TextDecoder) {
+          const _decode = TextDecoder.prototype.decode;
+          TextDecoder.prototype.decode = function (...a) {
+            const r = _decode.apply(this, a);
+            rec(r);
+            return r;
+          };
+        }
+      } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore */ }
+  };
+}
+
 function iphoneContextOptions() {
   const device = devices[config.crawl.deviceProfile] || devices['iPhone 13'];
   return {
@@ -64,6 +124,7 @@ function iphoneContextOptions() {
 export async function fetchAsIphone(url) {
   const browser = await getBrowser();
   const context = await browser.newContext(iphoneContextOptions());
+  await context.addInitScript(sinkHookScript());
   const page = await context.newPage();
 
   const subRequests = [];
@@ -87,6 +148,9 @@ export async function fetchAsIphone(url) {
     redirectChain: [],
     subRequests,
     links: [],
+    title: null,
+    description: null,
+    runtimeDecoded: [],
     error: null,
   };
 
@@ -152,6 +216,23 @@ export async function fetchAsIphone(url) {
       });
     } catch {
       result.links = [];
+    }
+
+    // Landing-page metadata + runtime-captured decoded plaintext.
+    try {
+      const meta = await page.evaluate(() => ({
+        title: document.title || null,
+        description:
+          document.querySelector('meta[name="description" i]')?.content ||
+          document.querySelector('meta[property="og:description" i]')?.content ||
+          null,
+        decoded: Array.isArray(window.__wcm_decoded) ? window.__wcm_decoded.slice(0, 5000) : [],
+      }));
+      result.title = meta.title;
+      result.description = meta.description;
+      result.runtimeDecoded = meta.decoded || [];
+    } catch {
+      /* page may have been torn down (e.g. a download) */
     }
   } catch (err) {
     const msg = String(err && err.message ? err.message : err);

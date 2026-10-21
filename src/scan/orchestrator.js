@@ -66,17 +66,20 @@ async function processNode(item, { run, task, xorKeys, stats, context }) {
     contentType: fetched.contentType,
     buffer: fetched.buffer,
     body: fetched.body,
+    status: fetched.status,
   });
 
   const node = await one(
     `INSERT INTO scan_nodes
        (run_id, parent_id, url, depth, discovery_method, decoded_via,
-        http_status, content_type, is_webclip, error)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        http_status, content_type, is_webclip, error,
+        title, description, final_url)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING id`,
     [
       run.id, item.parentId, item.url, item.depth, item.discovery, item.decodedVia,
       fetched.status, fetched.contentType, isClip, fetched.error,
+      fetched.title, fetched.description, fetched.finalUrl,
     ]
   );
 
@@ -120,7 +123,12 @@ async function processNode(item, { run, task, xorKeys, stats, context }) {
   // Redirect chain + runtime sub-requests are the strongest signals.
   const runtimeUrls = [...fetched.redirectChain, ...fetched.subRequests.map((r) => r.url)];
 
-  const candidates = runDecoders({ body: fetched.body, runtimeUrls, xorKeys });
+  const candidates = runDecoders({
+    body: fetched.body,
+    runtimeUrls,
+    runtimeDecoded: fetched.runtimeDecoded,
+    xorKeys,
+  });
   for (const c of candidates) {
     add(c.url, c.via === 'runtime' || c.via === 'plaintext' ? c.via : 'decoded', c.via);
   }

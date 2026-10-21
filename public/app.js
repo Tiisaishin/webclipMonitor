@@ -88,12 +88,13 @@ async function showRun(runId) {
   ]);
 
   el('#run-webclips').innerHTML = webclips.length
-    ? `<table><thead><tr><th>Domain</th><th>Status</th><th>Expiry</th><th>Full URL</th><th>Signed</th></tr></thead><tbody>${
+    ? `<table><thead><tr><th>Domain</th><th>Status</th><th>Expiry</th><th>Full URL</th><th>Source page</th><th>Signed</th></tr></thead><tbody>${
         webclips.map((w) => `<tr>
           <td>${esc(w.domain || '—')}</td>
           <td>${badge(w.status)}</td>
           <td>${w.expiry_date ? new Date(w.expiry_date).toISOString().slice(0, 10) : '—'}</td>
           <td><a href="${esc(w.full_url)}" target="_blank" rel="noopener">${esc((w.full_url || '').slice(0, 50))}</a></td>
+          <td title="${esc(w.source_url || '')}">${esc(w.source_title || (w.source_url || '').slice(0, 40))}</td>
           <td>${w.signed ? '🔏' : ''}</td>
         </tr>`).join('')
       }</tbody></table>`
@@ -112,7 +113,8 @@ async function showRun(runId) {
       const cls = n.is_webclip ? 'clip' : n.error ? 'err' : '';
       const tag = n.is_webclip ? ' 📎WEBCLIP' : n.error ? ` ✗${esc(n.error.slice(0, 40))}` : '';
       const via = n.decoded_via ? ` <span class="via">[${esc(n.decoded_via)}]</span>` : '';
-      lines.push(`<div class="node ${cls}">${pad}${esc(n.url.slice(0, 90))}${via}${tag}</div>`);
+      const title = n.title ? ` <span class="title">“${esc(n.title.slice(0, 60))}”</span>` : '';
+      lines.push(`<div class="node ${cls}">${pad}${esc(n.url.slice(0, 90))}${title}${via}${tag}</div>`);
       walk(n.id, depth + 1);
     }
   };

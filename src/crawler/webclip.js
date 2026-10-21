@@ -11,15 +11,20 @@ const WEBCLIP_CONTENT_TYPES = [
  * (likely) carries a webclip. We look at content-type, URL suffix, and the
  * raw bytes themselves — any one is enough to treat it as a candidate.
  */
-export function looksLikeWebclip({ url, contentType, buffer, body }) {
-  if (contentType && WEBCLIP_CONTENT_TYPES.some((t) => contentType.includes(t))) {
-    return true;
-  }
-  if (/\.mobileconfig(\?|#|$)/i.test(url || '')) return true;
-
+export function looksLikeWebclip({ url, contentType, buffer, body, status }) {
+  // Actual profile content is always conclusive, whatever the status.
   const text = bufferText(buffer) || body || '';
   if (text.includes('com.apple.webClip.managed')) return true;
   if (text.includes('<!DOCTYPE plist') && text.includes('PayloadType')) return true;
+
+  // Content-type / URL-suffix signals only count on a successful fetch — a 404
+  // page served at a ".mobileconfig" path is not a webclip. status === null
+  // means a download interrupted navigation (the normal profile case).
+  const okStatus = status == null || status < 400;
+  if (!okStatus) return false;
+
+  if (contentType && WEBCLIP_CONTENT_TYPES.some((t) => contentType.includes(t))) return true;
+  if (/\.mobileconfig(\?|#|$)/i.test(url || '')) return true;
   return false;
 }
 

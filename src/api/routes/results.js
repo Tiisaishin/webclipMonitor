@@ -9,8 +9,9 @@ resultsRouter.get('/runs/:runId/tree', async (req, res) => {
   const run = await one('SELECT * FROM scan_runs WHERE id = $1', [req.params.runId]);
   if (!run) return res.status(404).json({ error: 'not found' });
   const nodes = await many(
-    `SELECT id, parent_id, url, depth, discovery_method, decoded_via,
-            http_status, content_type, is_webclip, error, fetched_at
+    `SELECT id, parent_id, url, final_url, title, description, depth,
+            discovery_method, decoded_via, http_status, content_type,
+            is_webclip, error, fetched_at
        FROM scan_nodes WHERE run_id = $1 ORDER BY id`,
     [req.params.runId]
   );
@@ -20,7 +21,7 @@ resultsRouter.get('/runs/:runId/tree', async (req, res) => {
 // Webclips (+ their urls/domains) discovered in a run.
 resultsRouter.get('/runs/:runId/webclips', async (req, res) => {
   const rows = await many(
-    `SELECT w.id, w.signed, w.label, n.url AS source_url,
+    `SELECT w.id, w.signed, w.label, n.url AS source_url, n.title AS source_title,
             u.full_url, d.domain, d.expiry_date, d.status
        FROM webclips w
        JOIN scan_nodes n ON n.id = w.node_id
