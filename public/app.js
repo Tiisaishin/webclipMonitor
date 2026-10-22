@@ -227,7 +227,7 @@ async function showRun(runId) {
           <td>${badge(w.status)}</td>
           <td>${w.expiry_date ? new Date(w.expiry_date).toISOString().slice(0, 10) : '—'}</td>
           <td><a href="${esc(w.full_url)}" target="_blank" rel="noopener">${esc((w.full_url || '').slice(0, 44))}</a></td>
-          <td title="${esc((w.landing_title ? w.landing_title + ' — ' : '') + (w.landing_url || ''))}">${esc(hostOf(w.landing_url) || '—')}${w.landing_title ? `<br><span class="sub">${esc(w.landing_title.slice(0, 24))}</span>` : ''}</td>
+          <td title="${esc((w.landing_title ? w.landing_title + ' — ' : '') + (w.landing_url || ''))}">${w.landing_url ? `<a href="${esc(w.landing_url)}" target="_blank" rel="noopener">${esc(hostOf(w.landing_url) || w.landing_url.slice(0, 32))}</a>` : '—'}${w.landing_title ? `<br><span class="sub">${esc(w.landing_title.slice(0, 24))}</span>` : ''}</td>
           <td class="pathcell">${fmtPath(w.path)}</td>
           <td>${w.signed ? '🔏' : ''}</td>
         </tr>`).join('')
@@ -271,7 +271,7 @@ async function loadDomains() {
     <td>${badge(d.status)}</td>
     <td>${d.expiry_date ? new Date(d.expiry_date).toISOString().slice(0, 10) : '—'}</td>
     <td>${d.full_url ? `<a href="${esc(d.full_url)}" target="_blank" rel="noopener" title="${esc(d.full_url)}">${esc(d.full_url.slice(0, 40))}</a>` : '—'}</td>
-    <td title="${esc((d.landing_title ? d.landing_title + ' — ' : '') + (d.landing_url || ''))}">${esc(hostOf(d.landing_url) || '—')}${d.landing_title ? `<br><span class="sub">${esc(d.landing_title.slice(0, 24))}</span>` : ''}</td>
+    <td title="${esc((d.landing_title ? d.landing_title + ' — ' : '') + (d.landing_url || ''))}">${d.landing_url ? `<a href="${esc(d.landing_url)}" target="_blank" rel="noopener">${esc(hostOf(d.landing_url) || d.landing_url.slice(0, 32))}</a>` : '—'}${d.landing_title ? `<br><span class="sub">${esc(d.landing_title.slice(0, 24))}</span>` : ''}</td>
     <td class="pathcell">${fmtPath(d.path)}</td>
     <td>${esc(d.registrar || '—')}</td>
     <td>${fmtDate(d.last_checked_at)}</td>
