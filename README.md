@@ -184,6 +184,17 @@ Two resources created **separately** in the dashboard — no `render.yaml`:
 - Free Postgres is time-limited by Render's current policy; back up anything you
   need to keep.
 
+### SnapDeploy (Docker)
+
+Deploy a Docker web service + managed PostgreSQL on
+[SnapDeploy](https://snapdeploy.dev). Same shape as Render: Docker runtime from
+GitHub, a managed Postgres, the platform-injected `PORT`, Telegram set in the
+admin. 详细中文教程见 [`docs/deploy-snapdeploy.md`](docs/deploy-snapdeploy.md).
+
+> Note: SnapDeploy's free tier is 512 MB RAM and Chromium is memory-hungry, so
+> a free container may OOM during real scans — use `CRAWL_CONCURRENCY=1` and
+> prefer a larger paid container for actual scanning.
+
 ## Configuration
 
 See `.env.example`. Notable settings:
