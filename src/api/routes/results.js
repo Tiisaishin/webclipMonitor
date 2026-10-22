@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { many, one, query } from '../../db/index.js';
 import { checkDomain } from '../../domain/service.js';
+import { classify } from '../../domain/checker.js';
 import { getSetting, setSetting } from '../../settings.js';
+import { config } from '../../config.js';
 import { parseIgnoreList, normalizeEntry, DEFAULT_IGNORE } from '../../domain/ignore.js';
 
 export const resultsRouter = Router();
@@ -103,6 +105,49 @@ resultsRouter.post('/domains/:id/unignore', async (req, res) => {
   await query(`UPDATE domains SET status='unknown', last_checked_at=NULL WHERE id=$1`, [req.params.id]);
   const updated = await checkDomain(row.id);
   res.json(updated);
+});
+
+// Manually edit a domain: expiry date and/or status. Lets you correct a lookup
+// or set a known expiry by hand. Body: {expiry_date?: ISO|null, status?}.
+resultsRouter.patch('/domains/:id', async (req, res) => {
+  const row = await one('SELECT * FROM domains WHERE id = $1', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const { expiry_date, status } = req.body || {};
+  const ALLOWED = new Set(['active', 'expiring', 'expired', 'unknown', 'ignored']);
+  if (status !== undefined && status !== null && !ALLOWED.has(status)) {
+    return res.status(400).json({ error: 'invalid status' });
+  }
+  let expiry = undefined;
+  if (expiry_date !== undefined) {
+    if (expiry_date === null || expiry_date === '') expiry = null;
+    else {
+      const d = new Date(expiry_date);
+      if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'invalid expiry_date' });
+      expiry = d;
+    }
+  }
+  // If the expiry was set/changed and no explicit status was given, recompute
+  // the status (expired / expiring / active) from the new date.
+  let effStatus = status;
+  if (effStatus === undefined && expiry !== undefined && expiry) {
+    const warnDays = Number.parseInt(await getSetting('expiry_warn_days'), 10) || config.domain.expiryWarnDays;
+    effStatus = classify(expiry, warnDays);
+  }
+  const updated = await one(
+    `UPDATE domains SET
+       expiry_date = COALESCE($2, expiry_date),
+       status = COALESCE($3, status),
+       last_checked_at = now()
+     WHERE id = $1 RETURNING *`,
+    [req.params.id, expiry === undefined ? null : expiry, effStatus ?? null]
+  );
+  res.json(updated);
+});
+
+// Delete a domain record (and its webclip_url links / notifications via FK).
+resultsRouter.delete('/domains/:id', async (req, res) => {
+  await query('DELETE FROM domains WHERE id = $1', [req.params.id]);
+  res.status(204).end();
 });
 
 // --- Ignore-domain list management ---
