@@ -207,7 +207,7 @@ async function showRun(runId) {
     (run?.error ? ` · <span class="err-n">${esc(run.error)}</span>` : '');
 
   el('#run-webclips').innerHTML = webclips.length
-    ? `<table><thead><tr><th>域名</th><th>状态</th><th>到期日</th><th>完整 URL</th><th>落地页</th><th>扫描路径</th><th>签名</th></tr></thead><tbody>${
+    ? `<div class="table-wrap"><table><thead><tr><th>域名</th><th>状态</th><th>到期日</th><th>完整 URL</th><th>落地页</th><th>扫描路径</th><th>签名</th></tr></thead><tbody>${
         webclips.map((w) => `<tr>
           <td>${esc(w.domain || '—')}</td>
           <td>${badge(w.status)}</td>
@@ -217,7 +217,7 @@ async function showRun(runId) {
           <td class="pathcell">${fmtPath(w.path)}</td>
           <td>${w.signed ? '🔏' : ''}</td>
         </tr>`).join('')
-      }</tbody></table>`
+      }</tbody></table></div>`
     : '<p class="hint">本次运行未发现 webclip。</p>';
 
   // Render the tree indented by depth.
