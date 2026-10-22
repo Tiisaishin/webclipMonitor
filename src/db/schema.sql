@@ -32,11 +32,6 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Self-heal: if a prior half-applied migration left a scan_runs table without
--- task_id, add it so the index below can be created (no-op on a fresh table,
--- where task_id already exists from CREATE TABLE above).
-ALTER TABLE scan_runs ADD COLUMN IF NOT EXISTS task_id BIGINT REFERENCES scan_tasks(id) ON DELETE CASCADE;
-
 CREATE INDEX IF NOT EXISTS idx_scan_runs_status ON scan_runs(status);
 CREATE INDEX IF NOT EXISTS idx_scan_runs_task ON scan_runs(task_id);
 
