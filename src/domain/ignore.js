@@ -27,6 +27,9 @@ export const DEFAULT_IGNORE = [
   // Social
   'twitter.com', 'x.com', 't.co', 'twimg.com', 'linkedin.com', 'licdn.com',
   'tiktok.com', 'tiktokcdn.com', 'telegram.org', 't.me',
+  // Standards / XML-HTML namespaces & DTDs — appear as xmlns/DOCTYPE noise,
+  // never a landing page.
+  'w3.org', 'schema.org', 'purl.org', 'xmlsoap.org', 'oasis-open.org',
 ];
 
 // Normalize a list entry: lowercase, trim, and drop a leading "*." so both
