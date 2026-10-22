@@ -27,9 +27,23 @@ export const DEFAULT_IGNORE = [
   'tiktok.com', 'tiktokcdn.com', 'telegram.org', 't.me',
 ];
 
+// Normalize a list entry: lowercase, trim, and drop a leading "*." so both
+// "*.example.com" (wildcard) and "example.com" mean the same thing — match the
+// domain and all its subdomains. A plain "sub.example.com" matches that host
+// (and its subdomains). Matching itself is done by isIgnoredDomain below.
+export function normalizeEntry(s) {
+  return String(s || '').trim().toLowerCase().replace(/^\*\./, '');
+}
+
 export function parseIgnoreList(raw) {
   if (!raw) return [];
-  return String(raw).split(/[\s,]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const part of String(raw).split(/[\s,]+/)) {
+    const e = normalizeEntry(part);
+    if (e && !seen.has(e)) { seen.add(e); out.push(e); } // dedup
+  }
+  return out;
 }
 
 // True if `domain` equals, or is a subdomain of, any ignore entry (defaults +

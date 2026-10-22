@@ -98,10 +98,6 @@
           <label>已知 XOR Key（逗号分隔，可选）
             <input name="xor_keys" placeholder="mykey,0xAB" />
           </label>
-          <label class="full">忽略域名名单（每行一个，可选；内置 google/freshchat/CDN 等已默认跳过）
-            <textarea name="ignore_domains" rows="4" spellcheck="false"
-              placeholder="example-cdn.com&#10;mychat.io"></textarea>
-          </label>
           <label class="full">每域名解码规则（JSON 数组，可选）
             <textarea name="decode_rules" rows="8" spellcheck="false"
               placeholder='[{"match":"example\\.com","aesKeys":[{"passphrase":"s3cret"}],"xorKeys":["0x5a"],"extract":"data-url=\"([^\"]+)\""}]'></textarea>
@@ -112,6 +108,19 @@
           </div>
         </form>
         <p class="hint" id="settings-status"></p>
+      </div>
+
+      <div class="card">
+        <h2>忽略域名名单</h2>
+        <p class="hint">命中的域名不查过期、不通知，重扫也跳过。支持泛域名（<code>example.com</code> 或 <code>*.example.com</code>，含所有子域）或单独域名。也可在运行日志里点「加入忽略」。</p>
+        <div class="row">
+          <input id="ign-input" placeholder="批量添加：逗号或换行分隔，如 a.com, *.b.com" style="flex:1" />
+          <button type="button" id="ign-add">添加</button>
+        </div>
+        <h3>自定义名单</h3>
+        <div id="ign-custom" class="chips"></div>
+        <h3>内置名单（只读）</h3>
+        <div id="ign-builtin" class="chips builtin"></div>
       </div>
     </section>
   </main>
