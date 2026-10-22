@@ -5,6 +5,26 @@ const FOLLOWABLE_SCHEMES = new Set(['http:', 'https:']);
 // param (e.g. itms-services://?action=download-manifest&url=...).
 const HANDOFF_SCHEMES = new Set(['itms-services:', 'apple-magnifier:', 'cydia:']);
 
+// Hosts that only ever serve XML/HTML namespaces, schemas and DTDs — they turn
+// up as xmlns / DOCTYPE noise, never as a page to crawl.
+const NAMESPACE_HOSTS = ['w3.org', 'schema.org', 'purl.org', 'xmlsoap.org', 'oasis-open.org'];
+
+// A namespace / schema / DTD reference, not a crawlable page. Covers the
+// namespace hosts above and any URL whose path is a DTD/XSD/schema document
+// (e.g. apple.com/DTDs/PropertyList-1.0.dtd from a .mobileconfig's DOCTYPE).
+export function isNamespaceUrl(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (NAMESPACE_HOSTS.some((h) => host === h || host.endsWith('.' + h))) return true;
+    if (/\.(dtd|xsd|ent|mod)$/i.test(u.pathname)) return true;
+    if (/\/dtds?\//i.test(u.pathname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function resolveUrl(raw, base) {
   if (!raw) return null;
   let candidate = raw.trim();
@@ -38,6 +58,7 @@ export function isFollowable(url) {
     if (!host) return false;
     const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');
     if (!isIp && !host.includes('.')) return false;
+    if (isNamespaceUrl(url)) return false; // xmlns/DOCTYPE/DTD, not a page
     return true;
   } catch {
     return false;
