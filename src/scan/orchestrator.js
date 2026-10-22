@@ -6,6 +6,7 @@ import { looksLikeWebclip, parseWebclip, urlToDomain } from '../crawler/webclip.
 import { resolveUrl, expandHandoff, isFollowable, normalize } from '../crawler/urls.js';
 import { resolveDecodeConfig } from '../crawler/decoders/rules.js';
 import { upsertDomain, checkDomain } from '../domain/service.js';
+import { logRun } from './logger.js';
 
 /**
  * Run a full exhaustive crawl for a task run.
@@ -38,10 +39,13 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
   //     and every other branch is exhausted up to max_depth.
   const standalone = task.site_type === 'standalone';
 
+  await logRun(run.id, 'info',
+    `开始扫描：${task.entry_url}（类型=${standalone ? '独立站' : '导航站'}，最大深度=${task.max_depth}）`);
+
   // Simple bounded-concurrency BFS: drain a layer in parallel batches.
   while (queue.length > 0) {
     if (stats.nodes >= config.crawl.maxNodesPerTask) {
-      console.warn(`[scan] run ${run.id} hit MAX_NODES_PER_TASK cap`);
+      await logRun(run.id, 'warn', `达到节点上限 ${config.crawl.maxNodesPerTask}，停止扩展`);
       break;
     }
     const batch = queue.splice(0, config.crawl.concurrency);
@@ -51,7 +55,7 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
 
     // Standalone site: first webclip is the answer — stop here.
     if (standalone && stats.webclips > 0) {
-      console.log(`[scan] run ${run.id} standalone: stopping after first webclip`);
+      await logRun(run.id, 'info', '独立站：已找到首个 webclip，提前停止');
       break;
     }
 
@@ -67,6 +71,8 @@ export async function runScan(run, task, { decodeConfig = {} } = {}) {
   }
 
   await query('UPDATE scan_runs SET stats = $2 WHERE id = $1', [run.id, JSON.stringify(stats)]);
+  await logRun(run.id, 'info',
+    `扫描结束：节点 ${stats.nodes}，webclip ${stats.webclips}，域名 ${stats.domains}，错误 ${stats.errors}`, stats);
   return stats;
 }
 
@@ -99,13 +105,17 @@ async function processNode(item, { run, task, decodeConfig, stats, context }) {
 
   if (fetched.error) {
     stats.errors++;
+    await logRun(run.id, 'error', `[深度${item.depth}] 抓取失败：${item.url} — ${fetched.error}`,
+      { url: item.url, depth: item.depth, discovery: item.discovery });
     return [];
   }
 
   // A webclip node is a leaf: parse it, record domains, stop this branch.
   if (isClip) {
     stats.webclips++;
-    await ingestWebclip(node.id, fetched, { task, stats, context });
+    await logRun(run.id, 'info', `[深度${item.depth}] 命中 webclip：${fetched.finalUrl}`,
+      { url: fetched.finalUrl, depth: item.depth, contentType: fetched.contentType });
+    await ingestWebclip(node.id, fetched, { run, task, stats, context });
     return [];
   }
 
@@ -152,11 +162,22 @@ async function processNode(item, { run, task, decodeConfig, stats, context }) {
     add(c.url, c.via === 'runtime' || c.via === 'plaintext' ? c.via : 'decoded', c.via);
   }
 
+  // Log the page visit and what decoders turned up (helps debug "why no webclip").
+  const vias = [...new Set(candidates.map((c) => c.via))];
+  await logRun(run.id, 'info',
+    `[深度${item.depth}] 抓取 ${item.url}（HTTP ${fetched.status ?? '—'}，标题「${fetched.title || ''}」）→ 发现 ${children.length} 个下一跳`,
+    { url: item.url, depth: item.depth, status: fetched.status, title: fetched.title,
+      childCount: children.length, decoders: vias });
+
   return children;
 }
 
-async function ingestWebclip(nodeId, fetched, { task, stats, context }) {
+async function ingestWebclip(nodeId, fetched, { run, task, stats, context }) {
   const parsed = parseWebclip({ buffer: fetched.buffer, body: fetched.body });
+  if (!parsed) {
+    await logRun(run.id, 'warn',
+      `检测到 webclip 但未能解析出 URL：${fetched.finalUrl}（可能是加密/异常的描述文件）`);
+  }
 
   // Reconstruct the full scan path (entry -> … -> this webclip) by walking
   // parent links, so each webclip records how it was reached.
@@ -205,6 +226,8 @@ async function ingestWebclip(nodeId, fetched, { task, stats, context }) {
       `INSERT INTO webclip_urls (webclip_id, domain_id, full_url) VALUES ($1,$2,$3)`,
       [clip.id, domainId, fullUrl]
     );
+    await logRun(run.id, 'info', `解析出完整 URL：${fullUrl} → 域名 ${domain || '(无法提取域名)'}`,
+      { fullUrl, domain, landingUrl });
     if (domainId) {
       // Pass landing page + title into the alert context too.
       await checkDomain(domainId, { ...context, webclipUrl: fullUrl, landingUrl, landingTitle });

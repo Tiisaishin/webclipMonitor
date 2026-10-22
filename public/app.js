@@ -119,9 +119,10 @@ async function showRun(runId) {
   const detail = el('#run-detail');
   detail.hidden = false;
   el('#run-id').textContent = `#${runId}`;
-  const [{ nodes }, webclips] = await Promise.all([
+  const [{ nodes }, webclips, logs] = await Promise.all([
     api.get(`/runs/${runId}/tree`),
     api.get(`/runs/${runId}/webclips`),
+    api.get(`/runs/${runId}/logs`),
   ]);
 
   el('#run-webclips').innerHTML = webclips.length
@@ -158,6 +159,16 @@ async function showRun(runId) {
   };
   walk(null, 0);
   el('#run-tree').innerHTML = lines.join('') || '<p class="hint">暂无节点。</p>';
+
+  // Run log.
+  el('#run-logs').innerHTML = (logs && logs.length)
+    ? logs.map((g) => {
+        const t = new Date(g.created_at).toLocaleTimeString('zh-CN');
+        return `<div class="logline ${esc(g.level)}"><span class="ts">${t}</span>` +
+               `<span class="lvl">${esc(g.level)}</span><span class="msg">${esc(g.message)}</span></div>`;
+      }).join('')
+    : '<p class="hint">暂无日志。</p>';
+
   detail.scrollIntoView({ behavior: 'smooth' });
 }
 

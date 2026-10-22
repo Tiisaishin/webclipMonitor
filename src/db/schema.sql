@@ -35,6 +35,18 @@ CREATE TABLE IF NOT EXISTS scan_runs (
 CREATE INDEX IF NOT EXISTS idx_scan_runs_status ON scan_runs(status);
 CREATE INDEX IF NOT EXISTS idx_scan_runs_task ON scan_runs(task_id);
 
+-- Per-run debug log: one row per notable step (fetch, decode, webclip, error…).
+CREATE TABLE IF NOT EXISTS scan_logs (
+  id          BIGSERIAL PRIMARY KEY,
+  run_id      BIGINT NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+  level       TEXT NOT NULL DEFAULT 'info',  -- debug|info|warn|error
+  message     TEXT NOT NULL,
+  data        JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_logs_run ON scan_logs(run_id, id);
+
 -- Every URL visited within a run forms a node in the crawl tree.
 CREATE TABLE IF NOT EXISTS scan_nodes (
   id                BIGSERIAL PRIMARY KEY,
