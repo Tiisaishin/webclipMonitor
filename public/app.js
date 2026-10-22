@@ -275,9 +275,11 @@ async function loadDomains() {
     <td>${fmtDate(d.last_checked_at)}</td>
     <td class="actions">
       <button class="ghost" data-check="${d.id}">重新检查</button>
+      <button class="ghost" data-edit="${d.id}" data-exp="${d.expiry_date ? new Date(d.expiry_date).toISOString().slice(0,10) : ''}">编辑到期日</button>
       ${d.status === 'ignored'
         ? `<button class="ghost" data-unignore="${d.id}">取消忽略</button>`
         : `<button class="ghost" data-ignore="${d.id}">忽略</button>`}
+      <button class="ghost" data-del="${d.id}" data-dom="${esc(d.domain)}">删除</button>
     </td>
   </tr>`).join('') || '<tr><td colspan="9" class="hint">暂无域名。</td></tr>';
   tbody.querySelectorAll('[data-check]').forEach((b) =>
@@ -286,6 +288,18 @@ async function loadDomains() {
     b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.ignore}/ignore`); loadDomains(); }));
   tbody.querySelectorAll('[data-unignore]').forEach((b) =>
     b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.unignore}/unignore`); loadDomains(); }));
+  tbody.querySelectorAll('[data-edit]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const v = prompt('输入到期日（YYYY-MM-DD），留空取消：', b.dataset.exp);
+      if (v === null || v.trim() === '') return;
+      const res = await api.patch(`/domains/${b.dataset.edit}`, { expiry_date: v.trim() });
+      if (res && res.error) alert(res.error); else loadDomains();
+    }));
+  tbody.querySelectorAll('[data-del]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!confirm(`确认删除域名 ${b.dataset.dom}？`)) return;
+      await api.del(`/domains/${b.dataset.del}`); loadDomains();
+    }));
 }
 
 // --- Settings ---
