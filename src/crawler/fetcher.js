@@ -121,6 +121,35 @@ function sinkHookScript() {
   };
 }
 
+// Hide the most obvious automation tells so风控/cloaking pages that gate the
+// webclip behind "is this a real device" checks still render for us. Runs
+// before any page script. Best-effort; wrapped so a failure never breaks load.
+function stealthScript() {
+  return () => {
+    try {
+      // navigator.webdriver = true is the #1 automation signal — remove it.
+      try { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); } catch (e) {}
+      try { delete Object.getPrototypeOf(navigator).webdriver; } catch (e) {}
+      // Plausible plugins / languages on mobile Safari.
+      try { Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] }); } catch (e) {}
+      // Permissions.query shouldn't reveal the headless mismatch.
+      try {
+        const orig = navigator.permissions && navigator.permissions.query;
+        if (orig) {
+          navigator.permissions.query = (p) =>
+            p && p.name === 'notifications'
+              ? Promise.resolve({ state: Notification.permission })
+              : orig.call(navigator.permissions, p);
+        }
+      } catch (e) {}
+      // A touch-capable device reports maxTouchPoints > 0.
+      try { Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 5 }); } catch (e) {}
+      // Remove the Playwright/CDP binding hints if present.
+      try { delete window.__playwright; delete window.__pw_manual; delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array; } catch (e) {}
+    } catch (e) { /* ignore */ }
+  };
+}
+
 function iphoneContextOptions() {
   const device = devices[config.crawl.deviceProfile] || devices['iPhone 13'];
   return {
@@ -151,6 +180,7 @@ function iphoneContextOptions() {
 export async function fetchAsIphone(url) {
   const browser = await getBrowser();
   const context = await browser.newContext(iphoneContextOptions());
+  await context.addInitScript(stealthScript());
   await context.addInitScript(sinkHookScript());
   const page = await context.newPage();
 
