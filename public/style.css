@@ -82,4 +82,27 @@ td a { color: var(--accent); text-decoration: none; }
 .logline.warn .msg { color: var(--orange); }
 .logline.error .lvl, .logline.error .msg { color: var(--red); }
 .logline.debug .lvl { color: var(--muted); }
+.logline .data { color: var(--muted); margin-left: 8px; font-size: 11px; }
+.logline .copyline { background:none; border:none; color:var(--muted); cursor:pointer; padding:0 4px; opacity:0; font-size:13px; align-self:center; }
+.logline:hover .copyline { opacity:1; }
+.logline .copyline:hover { color:var(--text); }
+
+/* Run history + meta */
+.run-history { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px; }
+.run-history .rh-label { color:var(--muted); font-size:12px; }
+.run-history .rh { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; display:flex; gap:5px; align-items:center; }
+.run-history .rh.on { border-color:var(--accent); }
+.run-meta { font-size:12px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:14px; }
+.err-n { color:var(--red); }
+
+/* Log toolbar */
+.log-head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.log-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; }
+.log-tools .log-count { color:var(--muted); }
+.log-tools .seg { display:inline-flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+.log-tools .seg button { background:var(--panel); border:none; color:var(--muted); padding:4px 9px; font-size:12px; cursor:pointer; border-right:1px solid var(--border); }
+.log-tools .seg button:last-child { border-right:none; }
+.log-tools .seg button.on { background:var(--accent); color:#06101f; font-weight:600; }
+.log-tools button.ghost { padding:4px 9px; font-size:12px; }
+.log-tools button.ghost[disabled] { opacity:.4; cursor:not-allowed; }
 .actions button { padding: 5px 9px; font-size: 12px; margin-left: 6px; }
