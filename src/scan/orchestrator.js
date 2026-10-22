@@ -141,11 +141,19 @@ async function processNode(item, { run, task, decodeConfig, stats, context }) {
     }
   };
 
+  // Jumps first: HTTP 30x + JS/meta navigations the page passed through.
+  for (const u of fetched.redirectChain || []) add(u, 'redirect', null);
+  if (fetched.finalUrl && normalize(fetched.finalUrl) !== normalize(item.url)) {
+    await logRun(run.id, 'info',
+      `[深度${item.depth}] 跳转：${item.url} → ${fetched.finalUrl}`,
+      { from: item.url, to: fetched.finalUrl, via: fetched.redirectChain || [] });
+  }
+
   // Structured links extracted from the rendered DOM (relative links resolved).
   for (const link of fetched.links || []) add(link, 'link', null);
 
-  // Redirect chain + runtime sub-requests are the strongest signals.
-  const runtimeUrls = [...fetched.redirectChain, ...fetched.subRequests.map((r) => r.url)];
+  // Runtime sub-requests are a secondary signal (XHR/fetch the page issued).
+  const runtimeUrls = fetched.subRequests.map((r) => r.url);
 
   // Resolve per-domain decode rules for this node's URL.
   const { xorKeys, aesKeys, extracts } = resolveDecodeConfig(fetched.finalUrl || item.url, decodeConfig);

@@ -159,6 +159,14 @@ export async function fetchAsIphone(url) {
     subRequests.push({ url: req.url(), resourceType: req.resourceType() });
   });
 
+  // Capture every URL the MAIN frame navigates to — this covers JS redirects
+  // (location.href/replace/assign), meta refresh, and multi-step hops, not just
+  // HTTP 30x. The entry is itself the first navigation; later ones are jumps.
+  const navChain = [];
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) navChain.push(frame.url());
+  });
+
   // Serving a .mobileconfig makes the browser start a *download* rather than a
   // navigation (this is exactly how iOS hands a profile to Settings). Capture
   // it so we can read the profile bytes.
@@ -187,8 +195,27 @@ export async function fetchAsIphone(url) {
       timeout: config.crawl.navTimeoutMs,
     });
 
-    // Give runtime redirects / JS a brief moment to fire.
-    await page.waitForTimeout(1500).catch(() => {});
+    // Let JS / meta-refresh redirects land: wait for the network to settle.
+    const settleMs = Math.min(config.crawl.navTimeoutMs, 6000);
+    await page.waitForLoadState('networkidle', { timeout: settleMs }).catch(() => {});
+    await page.waitForTimeout(400).catch(() => {});
+
+    // Delayed jumps (setTimeout redirect, meta refresh with a delay) don't
+    // generate network activity, so networkidle returns before they fire. If we
+    // haven't navigated away yet but the page looks like a redirect page, wait
+    // for location to actually change (bounded — only for suspected jump pages,
+    // so normal pages aren't slowed down).
+    if (page.url() === url) {
+      const mightJump = await page.evaluate(() => {
+        const h = document.documentElement ? document.documentElement.innerHTML : '';
+        return /location\s*\.\s*(href|replace|assign)|location\s*=|http-equiv=["']?refresh/i.test(h);
+      }).catch(() => false);
+      if (mightJump) {
+        await page.waitForFunction((u) => location.href !== u, url, { timeout: 4000 }).catch(() => {});
+        await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+        await page.waitForTimeout(300).catch(() => {});
+      }
+    }
 
     result.finalUrl = page.url();
 
@@ -233,17 +260,29 @@ export async function fetchAsIphone(url) {
         document.querySelectorAll('[src]').forEach((e) => add(e.src));
         document.querySelectorAll('iframe[src]').forEach((e) => add(e.src));
         document.querySelectorAll('form[action]').forEach((f) => add(f.action));
-        // <meta http-equiv="refresh" content="0;url=...">
+        // <meta http-equiv="refresh" content="0;url=..."> (may be quoted/spaced)
         document.querySelectorAll('meta[http-equiv="refresh" i]').forEach((m) => {
           const c = m.getAttribute('content') || '';
-          const match = c.match(/url=(.+)$/i);
-          if (match) add(new URL(match[1].trim(), location.href).href);
+          const match = c.match(/url\s*=\s*['"]?([^'"\s]+)/i);
+          if (match) { try { add(new URL(match[1], location.href).href); } catch (e) {} }
         });
         return [...urls];
       });
     } catch {
       result.links = [];
     }
+
+    // Merge JS/meta navigations into the redirect chain (dedup; drop the entry
+    // URL and the final URL, which are represented elsewhere). What's left are
+    // the intermediate hops a jump passed through.
+    const strip = (u) => (u || '').replace(/#.*$/, '').replace(/\/$/, '');
+    const seenNav = new Set([strip(url), strip(result.finalUrl)]);
+    const mergedChain = [...result.redirectChain];
+    for (const u of navChain) {
+      const s = strip(u);
+      if (s && !seenNav.has(s)) { seenNav.add(s); mergedChain.push(u); }
+    }
+    result.redirectChain = mergedChain;
 
     // Landing-page metadata + runtime-captured decoded plaintext.
     try {
