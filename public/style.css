@@ -15,6 +15,7 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden; /* a wide table scrolls inside its wrapper, never the page */
 }
 header {
   display: flex; align-items: center; gap: 24px;
@@ -54,6 +55,13 @@ button.ghost { background: transparent; border: 1px solid var(--border); color: 
 .row { display: flex; gap: 10px; align-items: center; }
 .hint { color: var(--muted); font-size: 12px; }
 code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+/* Wide tables scroll horizontally inside their own box on narrow screens. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 560px; }
+/* Keep each cell on one line so content doesn't squash into vertical text;
+   the row scrolls horizontally instead. Path cells may still wrap. */
+.table-wrap th, .table-wrap td { white-space: nowrap; }
+.table-wrap td.pathcell { white-space: normal; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
@@ -105,4 +113,18 @@ td a { color: var(--accent); text-decoration: none; }
 .log-tools .seg button.on { background:var(--accent); color:#06101f; font-weight:600; }
 .log-tools button.ghost { padding:4px 9px; font-size:12px; }
 .log-tools button.ghost[disabled] { opacity:.4; cursor:not-allowed; }
+
+/* --- Mobile --- */
+@media (max-width: 640px) {
+  header { flex-wrap: wrap; gap: 10px 16px; padding: 12px 16px; position: static; }
+  header h1 { font-size: 16px; width: 100%; }
+  nav { display: flex; flex-wrap: wrap; gap: 4px; }
+  main { padding: 16px; }
+  .card { padding: 14px; }
+  .grid { grid-template-columns: 1fr; }
+  .grid label.full, .grid button { grid-column: 1 / -1; }
+  .logs { font-size: 11px; }
+  .logline { white-space: normal; }
+  .pathcell { max-width: 220px; }
+}
 .actions button { padding: 5px 9px; font-size: 12px; margin-left: 6px; }
