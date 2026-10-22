@@ -256,9 +256,10 @@ export async function fetchAsIphone(url) {
       result.links = await page.evaluate(() => {
         const urls = new Set();
         const add = (u) => { if (u) urls.add(u); };
+        // Real navigations only — NOT img/script/link src (those are assets).
         document.querySelectorAll('a[href]').forEach((a) => add(a.href));
-        document.querySelectorAll('[src]').forEach((e) => add(e.src));
-        document.querySelectorAll('iframe[src]').forEach((e) => add(e.src));
+        document.querySelectorAll('area[href]').forEach((a) => add(a.href));
+        document.querySelectorAll('iframe[src], frame[src]').forEach((e) => add(e.src));
         document.querySelectorAll('form[action]').forEach((f) => add(f.action));
         // <meta http-equiv="refresh" content="0;url=..."> (may be quoted/spaced)
         document.querySelectorAll('meta[http-equiv="refresh" i]').forEach((m) => {
