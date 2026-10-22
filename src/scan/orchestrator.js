@@ -6,6 +6,7 @@ import { looksLikeWebclip, parseWebclip, urlToDomain } from '../crawler/webclip.
 import { resolveUrl, expandHandoff, isFollowable, normalize } from '../crawler/urls.js';
 import { resolveDecodeConfig } from '../crawler/decoders/rules.js';
 import { upsertDomain, checkDomain } from '../domain/service.js';
+import { isIgnoredDomain } from '../domain/ignore.js';
 import { logRun } from './logger.js';
 
 /**
@@ -17,10 +18,10 @@ import { logRun } from './logger.js';
  * becomes a leaf (we don't crawl past it), and we keep exhausting every other
  * branch up to max_depth. A global node cap guards against runaway trees.
  */
-export async function runScan(run, task, { decodeConfig = {} } = {}) {
+export async function runScan(run, task, { decodeConfig = {}, ignoreExtra = [] } = {}) {
   const visited = new Set();
   const stats = { nodes: 0, webclips: 0, domains: 0, errors: 0 };
-  const context = { taskName: task.name, entryUrl: task.entry_url };
+  const context = { taskName: task.name, entryUrl: task.entry_url, ignoreExtra };
 
   // Queue holds { url, depth, parentId, discovery, decodedVia }.
   const queue = [{
@@ -234,10 +235,12 @@ async function ingestWebclip(nodeId, fetched, { run, task, stats, context }) {
       `INSERT INTO webclip_urls (webclip_id, domain_id, full_url) VALUES ($1,$2,$3)`,
       [clip.id, domainId, fullUrl]
     );
-    await logRun(run.id, 'info', `解析出完整 URL：${fullUrl} → 域名 ${domain || '(无法提取域名)'}`,
-      { fullUrl, domain, landingUrl });
+    const ignored = domain && isIgnoredDomain(domain, context.ignoreExtra);
+    await logRun(run.id, 'info',
+      `解析出完整 URL：${fullUrl} → 域名 ${domain || '(无法提取域名)'}${ignored ? '（第三方域名，已跳过）' : ''}`,
+      { fullUrl, domain, landingUrl, ignored: !!ignored });
     if (domainId) {
-      // Pass landing page + title into the alert context too.
+      // checkDomain marks ignored domains and skips lookup/alert for them.
       await checkDomain(domainId, { ...context, webclipUrl: fullUrl, landingUrl, landingTitle });
     }
   }

@@ -98,6 +98,10 @@
           <label>已知 XOR Key（逗号分隔，可选）
             <input name="xor_keys" placeholder="mykey,0xAB" />
           </label>
+          <label class="full">忽略域名名单（每行一个，可选；内置 google/freshchat/CDN 等已默认跳过）
+            <textarea name="ignore_domains" rows="4" spellcheck="false"
+              placeholder="example-cdn.com&#10;mychat.io"></textarea>
+          </label>
           <label class="full">每域名解码规则（JSON 数组，可选）
             <textarea name="decode_rules" rows="8" spellcheck="false"
               placeholder='[{"match":"example\\.com","aesKeys":[{"passphrase":"s3cret"}],"xorKeys":["0x5a"],"extract":"data-url=\"([^\"]+)\""}]'></textarea>

@@ -1,6 +1,8 @@
 import { Router } from 'express';
-import { many, one } from '../../db/index.js';
+import { many, one, query } from '../../db/index.js';
 import { checkDomain } from '../../domain/service.js';
+import { getSetting, setSetting } from '../../settings.js';
+import { parseIgnoreList } from '../../domain/ignore.js';
 
 export const resultsRouter = Router();
 
@@ -74,6 +76,31 @@ resultsRouter.post('/domains/:id/check', async (req, res) => {
   if (!row) return res.status(404).json({ error: 'not found' });
   // Reset last_checked_at so the recheck interval doesn't short-circuit it.
   await one(`UPDATE domains SET last_checked_at = NULL WHERE id = $1 RETURNING id`, [req.params.id]);
+  const updated = await checkDomain(row.id);
+  res.json(updated);
+});
+
+// Mark a domain as ignored (third-party / non-distribution) and add it to the
+// persistent ignore list so future scans skip it everywhere.
+resultsRouter.post('/domains/:id/ignore', async (req, res) => {
+  const row = await one('SELECT * FROM domains WHERE id = $1', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const list = parseIgnoreList(await getSetting('ignore_domains'));
+  if (!list.includes(row.domain.toLowerCase())) {
+    list.push(row.domain.toLowerCase());
+    await setSetting('ignore_domains', list.join('\n'));
+  }
+  await query(`UPDATE domains SET status='ignored', last_checked_at=now() WHERE id=$1`, [req.params.id]);
+  res.json({ ...row, status: 'ignored' });
+});
+
+// Un-ignore: remove from the list and re-check it now.
+resultsRouter.post('/domains/:id/unignore', async (req, res) => {
+  const row = await one('SELECT * FROM domains WHERE id = $1', [req.params.id]);
+  if (!row) return res.status(404).json({ error: 'not found' });
+  const list = parseIgnoreList(await getSetting('ignore_domains')).filter((d) => d !== row.domain.toLowerCase());
+  await setSetting('ignore_domains', list.join('\n'));
+  await query(`UPDATE domains SET status='unknown', last_checked_at=NULL WHERE id=$1`, [req.params.id]);
   const updated = await checkDomain(row.id);
   res.json(updated);
 });

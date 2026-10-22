@@ -11,6 +11,7 @@ const ALLOWED = new Set([
   'expiry_warn_days',
   'xor_keys',
   'decode_rules',
+  'ignore_domains',
 ]);
 
 // Mask secrets on read.

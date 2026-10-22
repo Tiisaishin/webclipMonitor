@@ -2,6 +2,7 @@ import { one, query } from '../db/index.js';
 import { config } from '../config.js';
 import { getSetting } from '../settings.js';
 import { lookupExpiry, classify } from './checker.js';
+import { isIgnoredDomain, parseIgnoreList } from './ignore.js';
 import { sendTelegram, formatExpiryAlert } from '../notify/telegram.js';
 
 // Upsert a domain row, returning its id. Does not trigger a check.
@@ -30,6 +31,16 @@ function isStale(lastChecked) {
 export async function checkDomain(domainId, context = {}) {
   const row = await one('SELECT * FROM domains WHERE id = $1', [domainId]);
   if (!row) return null;
+
+  // Third-party / non-distribution domains (google, freshchat, CDNs, …) are
+  // marked 'ignored' and never looked up or alerted — including on re-scan.
+  const ignoreExtra = context.ignoreExtra || parseIgnoreList(await getSetting('ignore_domains'));
+  if (row.status === 'ignored' || isIgnoredDomain(row.domain, ignoreExtra)) {
+    if (row.status !== 'ignored') {
+      await query(`UPDATE domains SET status='ignored', last_checked_at=now() WHERE id=$1`, [domainId]);
+    }
+    return { ...row, status: 'ignored' };
+  }
 
   if (!isStale(row.last_checked_at) && row.status && row.status !== 'unknown') {
     return row; // fresh enough

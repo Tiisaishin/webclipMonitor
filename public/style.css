@@ -70,7 +70,7 @@ td a { color: var(--accent); text-decoration: none; }
 .badge.expired { background: rgba(255,91,110,.15); color: var(--red); }
 .badge.expiring { background: rgba(255,164,59,.15); color: var(--orange); }
 .badge.active { background: rgba(68,208,123,.15); color: var(--green); }
-.badge.unknown, .badge.queued, .badge.running { background: rgba(139,147,167,.15); color: var(--muted); }
+.badge.unknown, .badge.queued, .badge.running, .badge.ignored { background: rgba(139,147,167,.15); color: var(--muted); }
 .badge.done { background: rgba(68,208,123,.15); color: var(--green); }
 .badge.error { background: rgba(255,91,110,.15); color: var(--red); }
 .tree { font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.6; }
