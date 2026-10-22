@@ -14,9 +14,11 @@ export const DEFAULT_IGNORE = [
   'freshchat.com', 'freshworks.com', 'freshdesk.com', 'intercom.io',
   'intercomcdn.com', 'zendesk.com', 'zdassets.com', 'crisp.chat', 'tawk.to',
   'hotjar.com', 'sentry.io', 'segment.com', 'mixpanel.com', 'livechatinc.com',
-  // CDNs / infra
-  'cloudflare.com', 'cloudflareinsights.com', 'cloudfront.net', 'akamaihd.net',
-  'akamai.net', 'fastly.net', 'amazonaws.com', 'azureedge.net', 'windows.net',
+  // Pure asset CDNs / infra. NOTE: general hosting/CDN domains that commonly
+  // host whole landing pages (cloudfront.net, amazonaws.com, azureedge.net,
+  // windows.net, fastly.net, …) are deliberately NOT ignored by default — add
+  // specific ones to the ignore list yourself if needed.
+  'cloudflare.com', 'cloudflareinsights.com', 'akamaihd.net', 'akamai.net',
   'jsdelivr.net', 'cdnjs.com', 'unpkg.com', 'bootstrapcdn.com', 'jquery.com',
   'fontawesome.com', 'typekit.net', 'gravatar.com',
   // Platforms
