@@ -22,6 +22,22 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+// Read a captured download into result (bytes + url + profile content-type).
+async function readDownloadInto(result, dl) {
+  try {
+    const stream = await dl.createReadStream();
+    result.buffer = await streamToBuffer(stream);
+    result.finalUrl = dl.url();
+    const name = dl.suggestedFilename() || '';
+    if (/\.mobileconfig/i.test(name) || /\.mobileconfig/i.test(dl.url())) {
+      result.contentType = 'application/x-apple-aspen-config';
+    }
+    result.error = null;
+  } catch (e) {
+    result.error = `download read failed: ${e.message}`;
+  }
+}
+
 export async function closeBrowser() {
   if (browserPromise) {
     const b = await browserPromise;
@@ -331,25 +347,53 @@ export async function fetchAsIphone(url) {
     } catch {
       /* page may have been torn down (e.g. a download) */
     }
+
+    // Click-to-install: many distribution pages build the .mobileconfig URL
+    // only inside an install button's click handler (the button has no href),
+    // then navigate/download. If we haven't captured a profile yet, click the
+    // most install-like control and capture whatever download/navigation it
+    // triggers. Marks one element and clicks it; best-effort.
+    if (!capturedDownload) {
+      try {
+        const marked = await page.evaluate(() => {
+          const rx = /(安装|下载|获取|立即|马上|领取|install|download|get\s*app|open\s*app)/i;
+          const nodes = document.querySelectorAll('a,button,[onclick],[role="button"],.btn,div,span');
+          let best = null, bs = 0;
+          for (const e of nodes) {
+            const txt = (e.textContent || '').trim();
+            if (txt.length > 24) continue; // a button label is short
+            const meta = ((e.id || '') + ' ' + (e.className || '')).toLowerCase();
+            let s = 0;
+            if (rx.test(txt)) s += 2;
+            if (/download|install|instal|\bdown\b|dl-?btn|an-?zhuang/.test(meta)) s += 2;
+            if (e.id === 'downloadBtn' || e.id === 'installBtn') s += 3;
+            if (e.tagName === 'A' && !e.getAttribute('href')) s += 1;
+            if (s > bs) { bs = s; best = e; }
+          }
+          if (best && bs >= 2) { best.setAttribute('data-wcm-install', '1'); return true; }
+          return false;
+        }).catch(() => false);
+        if (marked) {
+          const before = page.url();
+          await page.click('[data-wcm-install="1"]', { timeout: 3000, noWaitAfter: true }).catch(() => {});
+          await page.waitForTimeout(2200).catch(() => {});
+          if (capturedDownload) {
+            await readDownloadInto(result, capturedDownload);
+          } else if (page.url() !== before) {
+            // Navigated somewhere new → treat as a discovered next hop.
+            result.finalUrl = page.url();
+            if (!result.links.includes(page.url())) result.links.push(page.url());
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
   } catch (err) {
     const msg = String(err && err.message ? err.message : err);
     // A download interrupting navigation is a success for us: read its bytes.
     if (capturedDownload || /download is starting/i.test(msg)) {
       const dl = capturedDownload || await page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
-      if (dl) {
-        try {
-          const stream = await dl.createReadStream();
-          result.buffer = await streamToBuffer(stream);
-          result.finalUrl = dl.url();
-          const name = dl.suggestedFilename() || '';
-          if (/\.mobileconfig$/i.test(name)) result.contentType = 'application/x-apple-aspen-config';
-          result.error = null;
-        } catch (e) {
-          result.error = `download read failed: ${e.message}`;
-        }
-      } else {
-        result.error = msg;
-      }
+      if (dl) await readDownloadInto(result, dl);
+      else result.error = msg;
     } else {
       result.error = msg;
     }
