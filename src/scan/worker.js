@@ -3,6 +3,7 @@ import { runScan } from './orchestrator.js';
 import { closeBrowser } from '../crawler/fetcher.js';
 import { getSetting } from '../settings.js';
 import { parseRules } from '../crawler/decoders/rules.js';
+import { logRun } from './logger.js';
 
 let running = false;
 let stopped = false;
@@ -45,6 +46,7 @@ async function executeRun(run) {
     console.log(`[worker] run ${run.id} done`, stats);
   } catch (err) {
     console.error(`[worker] run ${run.id} failed`, err);
+    await logRun(run.id, 'error', `运行异常中止：${String(err.message || err)}`);
     await query(
       `UPDATE scan_runs SET status='error', error=$2, finished_at=now() WHERE id=$1`,
       [run.id, String(err.message || err)]

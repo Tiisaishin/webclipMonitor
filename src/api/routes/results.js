@@ -18,6 +18,16 @@ resultsRouter.get('/runs/:runId/tree', async (req, res) => {
   res.json({ run, nodes });
 });
 
+// Debug log for a run.
+resultsRouter.get('/runs/:runId/logs', async (req, res) => {
+  const rows = await many(
+    `SELECT id, level, message, data, created_at
+       FROM scan_logs WHERE run_id = $1 ORDER BY id`,
+    [req.params.runId]
+  );
+  res.json(rows);
+});
+
 // Webclips (+ their urls/domains) discovered in a run.
 resultsRouter.get('/runs/:runId/webclips', async (req, res) => {
   const rows = await many(
