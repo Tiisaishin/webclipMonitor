@@ -115,15 +115,96 @@ el('#task-form').addEventListener('submit', async (e) => {
   loadTasks();
 });
 
+// Clipboard helper with a textarea fallback for non-secure contexts.
+function copyText(text, btn) {
+  const done = () => { if (btn) { const o = btn.textContent; btn.textContent = '已复制'; setTimeout(() => (btn.textContent = o), 1200); } };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallback());
+  } else fallback();
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch {}
+    document.body.removeChild(ta);
+  }
+}
+
+const logLineText = (g) => {
+  const t = new Date(g.created_at).toLocaleTimeString('zh-CN');
+  const data = g.data ? ` | ${JSON.stringify(g.data)}` : '';
+  return `${t} [${g.level}] ${g.message}${data}`;
+};
+
+let currentLogs = [];
+let logFilter = 'all'; // all | warn | error
+
+function renderLogs() {
+  const tools = el('#log-tools');
+  const box = el('#run-logs');
+  const errs = currentLogs.filter((g) => g.level === 'error');
+  const warns = currentLogs.filter((g) => g.level === 'warn' || g.level === 'error');
+  const shown = logFilter === 'error' ? errs : logFilter === 'warn' ? warns : currentLogs;
+
+  tools.innerHTML =
+    `<span class="log-count">共 ${currentLogs.length} 条` +
+    (errs.length ? ` · <b class="err-n">错误 ${errs.length}</b>` : '') + `</span>` +
+    `<span class="seg">` +
+    `<button data-f="all" class="${logFilter === 'all' ? 'on' : ''}">全部</button>` +
+    `<button data-f="warn" class="${logFilter === 'warn' ? 'on' : ''}">警告+错误</button>` +
+    `<button data-f="error" class="${logFilter === 'error' ? 'on' : ''}">仅错误</button>` +
+    `</span>` +
+    `<button data-copy="all" class="ghost">复制全部</button>` +
+    `<button data-copy="error" class="ghost"${errs.length ? '' : ' disabled'}>复制错误</button>`;
+
+  box.innerHTML = shown.length
+    ? shown.map((g) => {
+        const t = new Date(g.created_at).toLocaleTimeString('zh-CN');
+        const data = g.data ? `<span class="data">${esc(JSON.stringify(g.data))}</span>` : '';
+        return `<div class="logline ${esc(g.level)}"><span class="ts">${t}</span>` +
+               `<span class="lvl">${esc(g.level)}</span>` +
+               `<span class="msg">${esc(g.message)}${data}</span>` +
+               `<button class="copyline" title="复制此行">⧉</button></div>`;
+      }).join('')
+    : '<p class="hint">没有符合条件的日志。</p>';
+
+  tools.querySelectorAll('[data-f]').forEach((b) =>
+    b.addEventListener('click', () => { logFilter = b.dataset.f; renderLogs(); }));
+  tools.querySelector('[data-copy="all"]').addEventListener('click', (e) =>
+    copyText(currentLogs.map(logLineText).join('\n'), e.target));
+  const ce = tools.querySelector('[data-copy="error"]');
+  if (ce && !ce.disabled) ce.addEventListener('click', (e) =>
+    copyText(errs.map(logLineText).join('\n'), e.target));
+  box.querySelectorAll('.copyline').forEach((b, i) =>
+    b.addEventListener('click', (e) => copyText(logLineText(shown[i]), e.target)));
+}
+
 async function showRun(runId) {
   const detail = el('#run-detail');
   detail.hidden = false;
-  el('#run-id').textContent = `#${runId}`;
-  const [{ nodes }, webclips, logs] = await Promise.all([
+  logFilter = 'all';
+  const [{ nodes, run }, webclips, logs] = await Promise.all([
     api.get(`/runs/${runId}/tree`),
     api.get(`/runs/${runId}/webclips`),
     api.get(`/runs/${runId}/logs`),
   ]);
+
+  // Run history for this task — each run is a separate, selectable block.
+  const runs = run?.task_id ? await api.get(`/tasks/${run.task_id}/runs`) : [run].filter(Boolean);
+  el('#run-history').innerHTML = `<span class="rh-label">运行历史：</span>` + runs.map((r) =>
+    `<button class="rh ${String(r.id) === String(runId) ? 'on' : ''}" data-run="${r.id}">` +
+    `#${r.id} ${badge(r.status)}</button>`).join('');
+  el('#run-history').querySelectorAll('[data-run]').forEach((b) =>
+    b.addEventListener('click', () => showRun(b.dataset.run)));
+
+  // Meta header = this run's divider: id, time, status, stats.
+  const st = run?.stats || {};
+  const started = run?.started_at ? new Date(run.started_at).toLocaleString('zh-CN') : '—';
+  el('#run-meta').innerHTML =
+    `<b>运行 #${runId}</b> · ${badge(run?.status)} · 开始 ${started}` +
+    ` · 节点 ${st.nodes ?? 0} · webclip ${st.webclips ?? 0} · 域名 ${st.domains ?? 0}` +
+    ` · <span class="${(st.errors ?? 0) > 0 ? 'err-n' : ''}">错误 ${st.errors ?? 0}</span>` +
+    (run?.error ? ` · <span class="err-n">${esc(run.error)}</span>` : '');
 
   el('#run-webclips').innerHTML = webclips.length
     ? `<table><thead><tr><th>域名</th><th>状态</th><th>到期日</th><th>完整 URL</th><th>落地页</th><th>扫描路径</th><th>签名</th></tr></thead><tbody>${
@@ -160,14 +241,9 @@ async function showRun(runId) {
   walk(null, 0);
   el('#run-tree').innerHTML = lines.join('') || '<p class="hint">暂无节点。</p>';
 
-  // Run log.
-  el('#run-logs').innerHTML = (logs && logs.length)
-    ? logs.map((g) => {
-        const t = new Date(g.created_at).toLocaleTimeString('zh-CN');
-        return `<div class="logline ${esc(g.level)}"><span class="ts">${t}</span>` +
-               `<span class="lvl">${esc(g.level)}</span><span class="msg">${esc(g.message)}</span></div>`;
-      }).join('')
-    : '<p class="hint">暂无日志。</p>';
+  // Run log (filterable + copyable).
+  currentLogs = logs || [];
+  renderLogs();
 
   detail.scrollIntoView({ behavior: 'smooth' });
 }
