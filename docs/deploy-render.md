@@ -116,6 +116,7 @@
 |------|-------------|
 | 首次构建很慢或超时 | Playwright 基础镜像约 2GB，首次拉取慢，属正常；重试即可 |
 | 启动报连不上数据库 | 确认 Web 与 DB **同一区域**、用的是 **Internal URL**；跨区或用 External 则加 `DATABASE_SSL=true` |
+| 启动迁移报 `column ... does not exist`（库残留了半截损坏的表） | 见下方「数据库损坏时的一键重置」 |
 | 页面能开但扫描报内存错 / Chromium 崩溃 | 降低 `CRAWL_CONCURRENCY`（设 1），或升级实例规格 |
 | 定时任务到点不跑 | 免费实例休眠所致，见第 5 节「保活」 |
 | 域名过期查询一直是「未知」 | RDAP/WHOIS 需要出站网络（Render 默认允许）；个别 TLD 的 RDAP 可能不可用，会回退 WHOIS |
@@ -123,7 +124,27 @@
 
 ---
 
-## 7. 保活定时任务示例（可选）
+## 7. 数据库损坏时的一键重置（DB_RESET）
+
+如果早期部署失败在数据库里留下了**半截损坏的表**，启动迁移会报
+`column ... does not exist` 之类的错误。因为免费套餐没有 Shell 没法手动跑
+SQL，可以用环境变量一键清空重建（⚠️ **会清空该库所有数据**，本项目部署初期
+通常还没有真实数据，放心用）：
+
+1. 到 Web 服务的 **Environment** 页，临时添加环境变量：
+   - `DB_RESET` = `true`
+2. 保存（Render 会自动重新部署）。启动日志会出现
+   `[migrate] DB_RESET=true — dropping and recreating the public schema`
+   和 `[migrate] schema applied (after reset)`，服务正常起来。
+3. **立刻把 `DB_RESET` 这个环境变量删掉**（否则以后每次部署都会清空数据库！），
+   再保存一次即可。
+
+> 另一种等效做法：直接到 Render 控制台把那个 **PostgreSQL 实例删除重建**一个新的，
+> 把新的 Internal Database URL 更新到 Web 服务的 `DATABASE_URL`。二选一即可。
+
+---
+
+## 8. 保活定时任务示例（可选）
 
 用 [cron-job.org](https://cron-job.org) 创建一个任务：
 
