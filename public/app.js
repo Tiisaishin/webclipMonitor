@@ -28,6 +28,7 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '—');
 // Keep the English key as the CSS class (colors), show a Chinese label.
 const STATUS_LABEL = {
   expired: '已过期', expiring: '即将过期', active: '正常', unknown: '未知',
+  ignored: '已忽略',
   queued: '排队中', running: '运行中', done: '完成', error: '出错',
 };
 const badge = (s) => {
@@ -261,10 +262,19 @@ async function loadDomains() {
     <td class="pathcell">${fmtPath(d.path)}</td>
     <td>${esc(d.registrar || '—')}</td>
     <td>${fmtDate(d.last_checked_at)}</td>
-    <td class="actions"><button class="ghost" data-check="${d.id}">重新检查</button></td>
+    <td class="actions">
+      <button class="ghost" data-check="${d.id}">重新检查</button>
+      ${d.status === 'ignored'
+        ? `<button class="ghost" data-unignore="${d.id}">取消忽略</button>`
+        : `<button class="ghost" data-ignore="${d.id}">忽略</button>`}
+    </td>
   </tr>`).join('') || '<tr><td colspan="9" class="hint">暂无域名。</td></tr>';
   tbody.querySelectorAll('[data-check]').forEach((b) =>
     b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.check}/check`); loadDomains(); }));
+  tbody.querySelectorAll('[data-ignore]').forEach((b) =>
+    b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.ignore}/ignore`); loadDomains(); }));
+  tbody.querySelectorAll('[data-unignore]').forEach((b) =>
+    b.addEventListener('click', async () => { b.textContent = '…'; await api.post(`/domains/${b.dataset.unignore}/unignore`); loadDomains(); }));
 }
 
 // --- Settings ---
@@ -277,6 +287,7 @@ async function loadSettings() {
   f.expiry_warn_days.value = s.expiry_warn_days || '';
   f.xor_keys.value = s.xor_keys || '';
   f.decode_rules.value = s.decode_rules || '';
+  f.ignore_domains.value = s.ignore_domains || '';
 }
 
 el('#settings-form').addEventListener('submit', async (e) => {
