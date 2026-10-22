@@ -69,7 +69,7 @@ document.querySelectorAll('nav button').forEach((b) => {
     b.classList.add('active');
     el(`#${b.dataset.tab}`).classList.add('active');
     if (b.dataset.tab === 'domains') loadDomains();
-    if (b.dataset.tab === 'settings') loadSettings();
+    if (b.dataset.tab === 'settings') { loadSettings(); loadIgnore(); }
   });
 });
 
@@ -162,9 +162,14 @@ function renderLogs() {
     ? shown.map((g) => {
         const t = new Date(g.created_at).toLocaleTimeString('zh-CN');
         const data = g.data ? `<span class="data">${esc(JSON.stringify(g.data))}</span>` : '';
+        const dom = g.data && g.data.domain;
+        const ignBtn = (dom && !g.data.ignored)
+          ? `<button class="ign" data-ign="${esc(dom)}" title="把 ${esc(dom)} 加入忽略名单">加入忽略</button>`
+          : '';
         return `<div class="logline ${esc(g.level)}"><span class="ts">${t}</span>` +
                `<span class="lvl">${esc(g.level)}</span>` +
                `<span class="msg">${esc(g.message)}${data}</span>` +
+               ignBtn +
                `<button class="copyline" title="复制此行">⧉</button></div>`;
       }).join('')
     : '<p class="hint">没有符合条件的日志。</p>';
@@ -178,6 +183,12 @@ function renderLogs() {
     copyText(errs.map(logLineText).join('\n'), e.target));
   box.querySelectorAll('.copyline').forEach((b, i) =>
     b.addEventListener('click', (e) => copyText(logLineText(shown[i]), e.target)));
+  box.querySelectorAll('[data-ign]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      b.disabled = true; b.textContent = '…';
+      await api.post('/ignore-domains', { domain: b.dataset.ign });
+      b.textContent = '已忽略';
+    }));
 }
 
 async function showRun(runId) {
@@ -287,7 +298,25 @@ async function loadSettings() {
   f.expiry_warn_days.value = s.expiry_warn_days || '';
   f.xor_keys.value = s.xor_keys || '';
   f.decode_rules.value = s.decode_rules || '';
-  f.ignore_domains.value = s.ignore_domains || '';
+}
+
+// --- Ignore-domain list ---
+async function loadIgnore() {
+  const { custom, builtin } = await api.get('/ignore-domains');
+  el('#ign-custom').innerHTML = custom.length
+    ? custom.map((d) => `<span class="chip">${esc(d)}<button data-del="${esc(d)}" title="删除">✕</button></span>`).join('')
+    : '<span class="hint">暂无自定义项。</span>';
+  el('#ign-builtin').innerHTML = builtin.map((d) => `<span class="chip">${esc(d)}</span>`).join('');
+  el('#ign-custom').querySelectorAll('[data-del]').forEach((b) =>
+    b.addEventListener('click', async () => { await api.post('/ignore-domains/remove', { domain: b.dataset.del }); loadIgnore(); }));
+}
+async function addIgnore() {
+  const raw = el('#ign-input').value.trim();
+  if (!raw) return;
+  const domains = raw.split(/[\s,]+/).filter(Boolean);
+  await api.post('/ignore-domains', { domains });
+  el('#ign-input').value = '';
+  loadIgnore();
 }
 
 el('#settings-form').addEventListener('submit', async (e) => {
@@ -299,6 +328,9 @@ el('#settings-form').addEventListener('submit', async (e) => {
   el('#settings-status').textContent = res.error ? `❌ ${res.error}` : '已保存。';
   loadSettings();
 });
+
+el('#ign-add').addEventListener('click', addIgnore);
+el('#ign-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addIgnore(); } });
 
 el('#tg-test').addEventListener('click', async () => {
   el('#settings-status').textContent = '发送中…';

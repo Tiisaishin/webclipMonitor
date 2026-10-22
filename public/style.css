@@ -94,6 +94,16 @@ td a { color: var(--accent); text-decoration: none; }
 .logline .copyline { background:none; border:none; color:var(--muted); cursor:pointer; padding:0 4px; opacity:0; font-size:13px; align-self:center; }
 .logline:hover .copyline { opacity:1; }
 .logline .copyline:hover { color:var(--text); }
+.logline .ign { align-self:center; margin-left:8px; background:transparent; border:1px solid var(--border); color:var(--muted); font-size:11px; padding:2px 7px; border-radius:5px; cursor:pointer; white-space:nowrap; }
+.logline .ign:hover { color:var(--text); border-color:var(--accent); }
+.logline .ign:disabled { opacity:.6; cursor:default; }
+
+/* Ignore-domain chips */
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.chips.builtin { opacity:.7; }
+.chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--border); border-radius:999px; padding:3px 10px; font-size:12px; font-family:ui-monospace, Menlo, monospace; }
+.chip button { background:none; border:none; color:var(--muted); cursor:pointer; padding:0; font-size:12px; line-height:1; }
+.chip button:hover { color:var(--red); }
 
 /* Run history + meta */
 .run-history { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px; }

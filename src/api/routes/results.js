@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { many, one, query } from '../../db/index.js';
 import { checkDomain } from '../../domain/service.js';
 import { getSetting, setSetting } from '../../settings.js';
-import { parseIgnoreList } from '../../domain/ignore.js';
+import { parseIgnoreList, normalizeEntry, DEFAULT_IGNORE } from '../../domain/ignore.js';
 
 export const resultsRouter = Router();
 
@@ -103,6 +103,44 @@ resultsRouter.post('/domains/:id/unignore', async (req, res) => {
   await query(`UPDATE domains SET status='unknown', last_checked_at=NULL WHERE id=$1`, [req.params.id]);
   const updated = await checkDomain(row.id);
   res.json(updated);
+});
+
+// --- Ignore-domain list management ---
+
+// The custom list (editable) + the built-in list (read-only).
+resultsRouter.get('/ignore-domains', async (_req, res) => {
+  const custom = parseIgnoreList(await getSetting('ignore_domains'));
+  res.json({ custom, builtin: DEFAULT_IGNORE });
+});
+
+// Add one or many entries (deduped, normalized). Body: {domain} or {domains:[]}.
+resultsRouter.post('/ignore-domains', async (req, res) => {
+  const incoming = []
+    .concat(req.body?.domains || [])
+    .concat(req.body?.domain ? [req.body.domain] : [])
+    .map(normalizeEntry).filter(Boolean);
+  if (!incoming.length) return res.status(400).json({ error: 'no domain(s) provided' });
+  const list = parseIgnoreList(await getSetting('ignore_domains'));
+  const set = new Set(list);
+  for (const d of incoming) set.add(d);
+  const next = [...set];
+  await setSetting('ignore_domains', next.join('\n'));
+  // Mark any already-seen domains that now match as ignored.
+  await query(
+    `UPDATE domains SET status='ignored', last_checked_at=now()
+       WHERE lower(domain) = ANY($1::text[]) AND status <> 'ignored'`,
+    [incoming]
+  );
+  res.json({ custom: next });
+});
+
+// Remove one entry. Body: {domain}.
+resultsRouter.post('/ignore-domains/remove', async (req, res) => {
+  const target = normalizeEntry(req.body?.domain);
+  if (!target) return res.status(400).json({ error: 'no domain provided' });
+  const next = parseIgnoreList(await getSetting('ignore_domains')).filter((d) => d !== target);
+  await setSetting('ignore_domains', next.join('\n'));
+  res.json({ custom: next });
 });
 
 resultsRouter.get('/notifications', async (_req, res) => {
