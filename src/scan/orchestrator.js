@@ -153,8 +153,12 @@ async function processNode(item, { run, task, decodeConfig, stats, context }) {
   // Structured links extracted from the rendered DOM (relative links resolved).
   for (const link of fetched.links || []) add(link, 'link', null);
 
-  // Runtime sub-requests are a secondary signal (XHR/fetch the page issued).
-  const runtimeUrls = fetched.subRequests.map((r) => r.url);
+  // Runtime sub-requests: keep only navigations and data calls (document /
+  // xhr / fetch). Drop asset requests (script/stylesheet/image/font/media) —
+  // they are never crawl targets and would flood the queue.
+  const runtimeUrls = fetched.subRequests
+    .filter((r) => ['document', 'xhr', 'fetch'].includes(r.resourceType))
+    .map((r) => r.url);
 
   // Resolve per-domain decode rules for this node's URL.
   const { xorKeys, aesKeys, extracts } = resolveDecodeConfig(fetched.finalUrl || item.url, decodeConfig);

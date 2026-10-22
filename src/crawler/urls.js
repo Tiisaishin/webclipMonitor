@@ -9,6 +9,18 @@ const HANDOFF_SCHEMES = new Set(['itms-services:', 'apple-magnifier:', 'cydia:']
 // up as xmlns / DOCTYPE noise, never as a page to crawl.
 const NAMESPACE_HOSTS = ['w3.org', 'schema.org', 'purl.org', 'xmlsoap.org', 'oasis-open.org'];
 
+// Static assets — never a page/landing to crawl. Note: .mobileconfig is NOT
+// here (it's the target), and .json/.xml are left out (may carry data/targets).
+const ASSET_EXT = /\.(?:js|mjs|cjs|css|png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|woff2?|ttf|otf|eot|mp4|m4v|webm|ogg|ogv|mp3|wav|m4a|aac|flac|avi|mov|flv|wmv|mkv|pdf|zip|gz|tgz|rar|7z|map|wasm|apk|ipa|dmg|exe|css\.map)(?:[?#]|$)/i;
+
+export function isAssetUrl(url) {
+  try {
+    return ASSET_EXT.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 // A namespace / schema / DTD reference, not a crawlable page. Covers the
 // namespace hosts above and any URL whose path is a DTD/XSD/schema document
 // (e.g. apple.com/DTDs/PropertyList-1.0.dtd from a .mobileconfig's DOCTYPE).
@@ -59,6 +71,7 @@ export function isFollowable(url) {
     const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':');
     if (!isIp && !host.includes('.')) return false;
     if (isNamespaceUrl(url)) return false; // xmlns/DOCTYPE/DTD, not a page
+    if (isAssetUrl(url)) return false;     // js/css/image/font/media, not a page
     return true;
   } catch {
     return false;
