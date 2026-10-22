@@ -22,12 +22,15 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
-// Read a captured download into result (bytes + url + profile content-type).
-async function readDownloadInto(result, dl) {
+// Read a captured download into result (bytes + profile content-type). With
+// keepUrl, the page's finalUrl is preserved (used when a click on a landing
+// page triggers the profile download — the page itself is the landing page, so
+// its URL must not be replaced by the download URL).
+async function readDownloadInto(result, dl, { keepUrl = false } = {}) {
   try {
     const stream = await dl.createReadStream();
     result.buffer = await streamToBuffer(stream);
-    result.finalUrl = dl.url();
+    if (!keepUrl) result.finalUrl = dl.url();
     const name = dl.suggestedFilename() || '';
     if (/\.mobileconfig/i.test(name) || /\.mobileconfig/i.test(dl.url())) {
       result.contentType = 'application/x-apple-aspen-config';
@@ -378,7 +381,8 @@ export async function fetchAsIphone(url) {
           await page.click('[data-wcm-install="1"]', { timeout: 3000, noWaitAfter: true }).catch(() => {});
           await page.waitForTimeout(2200).catch(() => {});
           if (capturedDownload) {
-            await readDownloadInto(result, capturedDownload);
+            // The landing page triggered the download; keep its URL as finalUrl.
+            await readDownloadInto(result, capturedDownload, { keepUrl: true });
           } else if (page.url() !== before) {
             // Navigated somewhere new → treat as a discovered next hop.
             result.finalUrl = page.url();
